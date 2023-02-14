@@ -32,6 +32,13 @@ TEST_CASE("simple", "[expr_template]") {
   REQUIRE(e.lhs().lhs().rhs() == 5);
   REQUIRE(e.lhs().rhs() == 0.5);
   REQUIRE(e.rhs() == 2);
+  REQUIRE(fp_eval<float>(e) == -7.25);
+  std::cout << exactfp_eval<float>(e) << "\n";
+}
+
+TEST_CASE("simple", "[expr_template_eval]") {
+  auto e = ((arith_expr{} + 4 - 7) * 5 + 3.0 / 6.0);
+  std::cout << exactfp_eval<float>(e) << "\n";
 }
 
 TEST_CASE("Benchmark Approx Determinant", "[!benchmark]") {}
