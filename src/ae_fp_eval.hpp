@@ -96,6 +96,15 @@ void sparse_mult(std::span<eval_type> storage_left,
   auto unwritten_left = storage_left.begin();
   auto unwritten_right = storage_right.begin();
   auto unwritten_mult = storage_mult.begin();
+  // This performs multiplication in-place
+  // As soon as a value is no longer needed; it is overwritten
+  //
+  // Since the value in the outer loop is immediately copied and never returned
+  // to, it is overwritten immediately
+  //
+  // The value in the inner loop can be shown to only be overwritten after it
+  // was copied during the last iteration of the outer loop if storage_mult is
+  // sized correctly (ie, as specified by num_partials_for_exact)
   for (auto l : storage_left) {
     bool overwrote_l = false;
     for (auto r : storage_right) {
