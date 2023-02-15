@@ -14,12 +14,13 @@ public:
   using RHS = std::remove_cvref_t<RHS_>;
   using Op = std::remove_cvref_t<Op_>;
 
-  arith_expr() : m_lhs(), m_rhs() {}
+  constexpr arith_expr() : m_lhs(), m_rhs() {}
 
-  arith_expr(const LHS_ &lhs, const RHS_ &rhs) : m_lhs(lhs), m_rhs(rhs) {}
+  constexpr arith_expr(const LHS_ &lhs, const RHS_ &rhs)
+      : m_lhs(lhs), m_rhs(rhs) {}
 
-  const auto &lhs() const noexcept { return m_lhs; }
-  const auto &rhs() const noexcept { return m_rhs; }
+  constexpr auto &lhs() const noexcept { return m_lhs; }
+  constexpr auto &rhs() const noexcept { return m_rhs; }
 
   constexpr auto &operator()() { return *this; }
 

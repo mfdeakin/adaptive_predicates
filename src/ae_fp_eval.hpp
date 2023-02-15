@@ -18,7 +18,7 @@ namespace adaptive_expr {
 
 template <std::floating_point eval_type, typename E_>
   requires expr_type<E_> || arith_number<E_>
-constexpr eval_type fp_eval(E_&& e) noexcept {
+constexpr eval_type fp_eval(E_ &&e) noexcept {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr<E>::value) {
     using Op = typename E::Op;
@@ -32,27 +32,27 @@ constexpr eval_type fp_eval(E_&& e) noexcept {
 // point in-sphere test takes 2880 fp values to store the result...
 template <std::floating_point eval_type, typename E>
   requires expr_type<E> || arith_number<E>
-constexpr eval_type exactfp_eval(E&& e) noexcept {
+constexpr eval_type exactfp_eval(E &&e) noexcept {
   if constexpr (is_expr<std::remove_reference_t<E>>::value) {
     std::size_t storage_needed = num_partials_for_exact(std::forward<E>(e));
-    std::vector<eval_type> partial_results(storage_needed,
-                                           eval_type(0));
+    std::vector<eval_type> partial_results(storage_needed, eval_type(0));
     exactfp_eval_impl<eval_type>(
         std::forward<E>(e),
         std::span{partial_results.begin(), partial_results.end()});
     std::ranges::sort(partial_results);
-    return std::accumulate(partial_results.begin(), partial_results.end(), eval_type(0));
+    return std::accumulate(partial_results.begin(), partial_results.end(),
+                           eval_type(0));
   } else {
     return static_cast<eval_type>(e);
   }
 }
 
-  template <std::floating_point eval_type>
-  void sparse_mult(std::span<eval_type> storage_left,
-                   std::span<eval_type> storage_right,
-                   std::span<eval_type> storage_mult);
+template <std::floating_point eval_type>
+void sparse_mult(std::span<eval_type> storage_left,
+                 std::span<eval_type> storage_right,
+                 std::span<eval_type> storage_mult);
 
-  template <std::floating_point eval_type, typename E_>
+template <std::floating_point eval_type, typename E_>
   requires expr_type<E_> || arith_number<E_>
 constexpr void
 exactfp_eval_impl(E_ &&e, std::span<eval_type> partial_results) noexcept {
@@ -66,16 +66,20 @@ exactfp_eval_impl(E_ &&e, std::span<eval_type> partial_results) noexcept {
         partial_results.subspan(reserve_left, reserve_right);
     exactfp_eval_impl<eval_type>(e.rhs(), storage_right);
     using Op = typename E::Op;
-    // We only need compute anything more for multiplication, since we're
-    // assuming division doesn't exist, and addition is already represented by
-    // the vector of fp values
-    if constexpr (std::is_same_v<std::multiplies<>, Op>) {
+    // We only need compute anything more for subtraction and multiplication,
+    // since we're assuming division doesn't exist, and addition is already
+    // represented by the vector of fp values
+    if constexpr (std::is_same_v<std::minus<>, Op>) {
+      for (eval_type &v : storage_right) {
+        v = -v;
+      }
+    } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
       const auto storage_mult = partial_results.last(
           partial_results.size() - reserve_left - reserve_right);
       sparse_mult(storage_left, storage_right, storage_mult);
     }
-  } else {
-    *partial_results.begin()= eval_type(e);
+  } else if constexpr (!std::is_same_v<additive_id, E>) {
+    *partial_results.begin() = eval_type(e);
   }
 }
 
@@ -99,8 +103,8 @@ void sparse_mult(std::span<eval_type> storage_left,
       if (!overwrote_l) {
         *unwritten_left = m.first;
         unwritten_left++;
-        *unwritten_mult = m.second;
-        unwritten_mult++;
+        overflow_write(m.second, unwritten_mult, storage_mult.end(),
+                       unwritten_right);
         overwrote_l = true;
       } else {
         overflow_write(m.first, unwritten_mult, storage_mult.end(),

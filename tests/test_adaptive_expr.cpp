@@ -5,8 +5,6 @@
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
 
-#include <iostream>
-
 using namespace adaptive_expr;
 
 static_assert(is_expr<arith_expr<std::plus<>, float, float>>::value);
@@ -33,12 +31,19 @@ TEST_CASE("simple", "[expr_template]") {
   REQUIRE(e.lhs().rhs() == 0.5);
   REQUIRE(e.rhs() == 2);
   REQUIRE(fp_eval<float>(e) == -7.25);
-  std::cout << exactfp_eval<float>(e) << "\n";
 }
 
-TEST_CASE("simple", "[expr_template_eval]") {
+TEST_CASE("simple", "[expr_template_exact_eval]") {
+  static_assert(num_partials_for_exact(arith_expr{}) == 0);
+  static_assert(num_partials_for_exact(arith_expr{} + 4) == 1);
+  static_assert(num_partials_for_exact(arith_expr{} + 4 - 7) == 2);
+  static_assert(num_partials_for_exact((arith_expr{} + 4 - 7) * 5) == 4);
   auto e = ((arith_expr{} + 4 - 7) * 5 + 3.0 / 6.0);
-  std::cout << exactfp_eval<float>(e) << "\n";
+  REQUIRE(exactfp_eval<float>(e.lhs().lhs().lhs().lhs()) == 0.0);
+  REQUIRE(exactfp_eval<float>(e.lhs().lhs().lhs()) == 4.0);
+  REQUIRE(exactfp_eval<float>(e.lhs().lhs()) == -3.0);
+  REQUIRE(exactfp_eval<float>(e.lhs()) == -15.0);
+  REQUIRE(exactfp_eval<float>(e) == -14.5);
 }
 
 TEST_CASE("Benchmark Approx Determinant", "[!benchmark]") {}
