@@ -1,6 +1,10 @@
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_adapters.hpp>
+#include <catch2/generators/catch_generators_random.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
@@ -46,4 +50,32 @@ TEST_CASE("simple", "[expr_template_exact_eval]") {
   REQUIRE(exactfp_eval<float>(e) == -14.5);
 }
 
-TEST_CASE("Benchmark Approx Determinant", "[!benchmark]") {}
+TEST_CASE("Benchmark Determinant", "[!benchmark]") {
+  // Points used in the orientation expression
+  std::array<double, 6> points{1.0, 5.1, 323.04, -33.5, 234.1, 8.6};
+  using mult_expr = arith_expr<std::multiplies<>, double, double>;
+  BENCHMARK("build expr") {
+    return (mult_expr{points[1], points[5]} - mult_expr{points[2], points[4]}) -
+           (mult_expr{points[0], points[5]} - mult_expr{points[2], points[3]}) +
+           (mult_expr{points[0], points[4]} - mult_expr{points[1], points[3]});
+  };
+  BENCHMARK("no expr floating point") {
+    return points[1] * points[5] - points[2] * points[4] -
+           points[0] * points[5] + points[2] * points[3] +
+           points[0] * points[4] - points[1] * points[3];
+  };
+  BENCHMARK("floating point") {
+    auto e =
+        (mult_expr{points[1], points[5]} - mult_expr{points[2], points[4]}) -
+        (mult_expr{points[0], points[5]} - mult_expr{points[2], points[3]}) +
+        (mult_expr{points[0], points[4]} - mult_expr{points[1], points[3]});
+    return fp_eval<double>(e);
+  };
+  BENCHMARK("exact rounded") {
+    auto e =
+        (mult_expr{points[1], points[5]} - mult_expr{points[2], points[4]}) -
+        (mult_expr{points[0], points[5]} - mult_expr{points[2], points[3]}) +
+        (mult_expr{points[0], points[4]} - mult_expr{points[1], points[3]});
+    return exactfp_eval<double>(e);
+  };
+}
