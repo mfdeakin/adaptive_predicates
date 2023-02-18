@@ -1,5 +1,6 @@
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 option(SANITIZER_ADDRESS "Enable address sanitizer" OFF)
 option(SANITIZER_MEMORY "Enable memory sanitizer" OFF)

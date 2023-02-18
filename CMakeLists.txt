@@ -6,8 +6,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
 include(CompilerFlags)
 
-add_library(adaptive_predicates INTERFACE)
+add_library(adaptive_predicates INTERFACE src/ae_expr.hpp src/ae_expr_utils.hpp src/ae_fp_eval.hpp src/ae_adaptive_predicate_eval.hpp)
 target_include_directories(adaptive_predicates INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+add_subdirectory(extern)
 
 option(ADP_ENABLE_TESTS "Test suite" ON)
 if(ADP_ENABLE_TESTS)

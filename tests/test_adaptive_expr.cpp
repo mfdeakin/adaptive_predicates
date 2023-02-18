@@ -9,6 +9,8 @@
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
 
+#include "shewchuk.h"
+
 using namespace adaptive_expr;
 
 static_assert(is_expr<arith_expr<std::plus<>, float, float>>::value);
@@ -18,7 +20,7 @@ static_assert(is_expr<const arith_expr<std::plus<>, float, float> &>::value);
 static_assert(is_expr<arith_expr<std::plus<>, float, float> &&>::value);
 static_assert(is_expr<const arith_expr<std::plus<>, float, float> &&>::value);
 
-TEST_CASE("simple", "[expr_template]") {
+TEST_CASE("expr_template_structure", "[expr_template]") {
   auto e = ((arith_expr{} + 4 - 7) * 5 + 3.0 / 6.0) / 2;
   using E = typeof(e);
   static_assert(std::is_same_v<additive_id, E::LHS::LHS::LHS::LHS::LHS::LHS>);
@@ -37,7 +39,7 @@ TEST_CASE("simple", "[expr_template]") {
   REQUIRE(fp_eval<float>(e) == -7.25);
 }
 
-TEST_CASE("simple", "[expr_template_exact_eval]") {
+TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   static_assert(num_partials_for_exact(arith_expr{}) == 0);
   static_assert(num_partials_for_exact(arith_expr{} + 4) == 1);
   static_assert(num_partials_for_exact(arith_expr{} + 4 - 7) == 2);
@@ -48,9 +50,16 @@ TEST_CASE("simple", "[expr_template_exact_eval]") {
   REQUIRE(exactfp_eval<float>(e.lhs().lhs()) == -3.0);
   REQUIRE(exactfp_eval<float>(e.lhs()) == -15.0);
   REQUIRE(exactfp_eval<float>(e) == -14.5);
+  std::vector<float> fp_vals{5.0, 10.0, 11.0, 11.0, 44.0};
+  auto s = std::span{fp_vals};
+  merge_sum(s, s.first(2), s.subspan(2, 3));
+  for (auto [expected, val] :
+       std::ranges::views::zip(std::array{0.0, 0.0, 0.0, 0.0, 81.0}, s)) {
+    REQUIRE(val == expected);
+  }
 }
 
-TEST_CASE("Benchmark Determinant", "[!benchmark]") {
+TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   // Points used in the orientation expression
   std::array<double, 6> points{1.0, 5.1, 323.04, -33.5, 234.1, 8.6};
   using mult_expr = arith_expr<std::multiplies<>, double, double>;
@@ -77,5 +86,11 @@ TEST_CASE("Benchmark Determinant", "[!benchmark]") {
         (mult_expr{points[0], points[5]} - mult_expr{points[2], points[3]}) +
         (mult_expr{points[0], points[4]} - mult_expr{points[1], points[3]});
     return exactfp_eval<double>(e);
+  };
+  BENCHMARK("shewchuk floating point") {
+    return orient2dfast(&points[0], &points[2], &points[4]);
+  };
+  BENCHMARK("shewchuk exact rounded") {
+    return orient2d(&points[0], &points[2], &points[4]);
   };
 }

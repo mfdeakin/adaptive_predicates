@@ -1,0 +1,55 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "release",
+      "hidden": true,
+      "displayName": "Release Config",
+      "description": "Release config",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "debug",
+      "hidden": true,
+      "displayName": "Debug Config",
+      "description": "Debug config",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "gcc",
+      "hidden": true,
+      "displayName": "gcc Config",
+      "description": "gcc config",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "g++-13"
+      }
+    },
+    {
+      "name": "clang",
+      "hidden": true,
+      "displayName": "clang Config",
+      "description": "clang config",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "asan",
+      "hidden": true,
+      "displayName": "Address sanitizer",
+      "description": "Address sanitizer",
+      "cacheVariables": {
+        "SANITIZER_ADDRESS": "ON"
+      }
+    }
+  ]
+}
