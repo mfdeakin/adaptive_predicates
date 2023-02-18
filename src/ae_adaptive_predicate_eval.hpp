@@ -1,18 +1,29 @@
 
-#ifndef ADAPTIVE_PREDICATES_AE_ADAPTIVE_EVAL_HPP
-#define ADAPTIVE_PREDICATES_AE_ADAPTIVE_EVAL_HPP
+#ifndef ADAPTIVE_PREDICATES_AE_ADAPTIVE_PREDICATE_EVAL_HPP
+#define ADAPTIVE_PREDICATES_AE_ADAPTIVE_PREDICATE_EVAL_HPP
 
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
 #include "ae_fp_eval.hpp"
 
+#include <compare>
 #include <limits>
 
-template <std::floating_point eval_type, typename E>
-requires expr_type<E> || arith_number<E>
-constexpr eval_type exactfp_eval(E &&e) noexcept {
-  throw std::runtime_error("Not currently implemented!");
-  return std::numeric_limits<eval_type>::signaling_NaN();
+namespace adaptive_expr {
+
+template <typename E>
+  requires predicate<E>
+constexpr bool adaptive_compare(E &&e) noexcept {
+
+  return E::Op()(fp_eval<float>(e.lhs()), fp_eval<float>(e.lhs()));
 }
 
-#endif //ADAPTIVE_PREDICATES_AE_ADAPTIVE_EVAL_HPP
+template <typename E1, typename E2>
+  requires expr_type<E1> && expr_type<E2>
+constexpr std::strong_ordering adaptive_compare(E1 &&e1, E2 &&e2) noexcept {
+  return;
+}
+
+} // namespace adaptive_expr
+
+#endif // ADAPTIVE_PREDICATES_AE_ADAPTIVE_EVAL_HPP

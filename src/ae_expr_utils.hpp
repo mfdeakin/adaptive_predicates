@@ -6,6 +6,16 @@
 
 namespace adaptive_expr {
 
+template <typename Op>
+concept comparison_op = std::is_same_v<std::less<>, Op> ||
+                        std::is_same_v<std::greater_equal<>, Op> ||
+                        std::is_same_v<std::greater<>, Op> ||
+                        std::is_same_v<std::less_equal<>, Op> ||
+                        std::is_same_v<std::equal_to<>, Op>;
+
+template <typename E>
+concept predicate = expr_type<E> && comparison_op<typename E::Op>;
+
 template <typename E> constexpr std::size_t num_ops(const E &&e) {
   if constexpr (is_expr<E>::value) {
     return num_ops(e.lhs()) + num_ops(e.rhs()) + 1;
