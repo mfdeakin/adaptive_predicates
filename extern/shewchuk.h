@@ -4,14 +4,15 @@
 
 extern "C" {
 
-    double orient2d(double *pa, double *pb, double *pc);
-    double orient2dfast(double *pa, double *pb, double *pc);
-    double orient3d(double *pa, double *pb, double *pc);
-    double orient3dfast(double *pa, double *pb, double *pc);
-    double incircle(double *pa, double *pb, double *pc, double *pd);
-    double incirclefast(double *pa, double *pb, double *pc, double *pd);
-    double insphere(double *pa, double *pb, double *pc, double *pd, double *pe);
-    double inspherefast(double *pa, double *pb, double *pc, double *pd, double *pe);
+  void exactinit();
+  float orient2d(float *pa, float *pb, float *pc);
+  float orient2dfast(float *pa, float *pb, float *pc);
+  float orient3d(float *pa, float *pb, float *pc);
+  float orient3dfast(float *pa, float *pb, float *pc);
+  float incircle(float *pa, float *pb, float *pc, float *pd);
+  float incirclefast(float *pa, float *pb, float *pc, float *pd);
+  float insphere(float *pa, float *pb, float *pc, float *pd, float *pe);
+  float inspherefast(float *pa, float *pb, float *pc, float *pd, float *pe);
 
 }
 

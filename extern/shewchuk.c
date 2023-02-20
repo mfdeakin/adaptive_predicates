@@ -130,11 +130,11 @@
 #define INEXACT                          /* Nothing */
 /* #define INEXACT volatile */
 
-#define REAL double                      /* float or double */
-#define REALPRINT doubleprint
-#define REALRAND doublerand
-#define NARROWRAND narrowdoublerand
-#define UNIFORMRAND uniformdoublerand
+#define REAL float                      /* float or double */
+#define REALPRINT floatprint
+#define REALRAND floatrand
+#define NARROWRAND narrowfloatrand
+#define UNIFORMRAND uniformfloatrand
 
 /* Which of the following two methods of finding the absolute values is      */
 /*   fastest is compiler-dependent.  A few compilers can inline and optimize */
