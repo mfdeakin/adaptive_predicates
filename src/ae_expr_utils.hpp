@@ -32,16 +32,17 @@ template <typename E> constexpr std::size_t num_values(const E &&e) {
   }
 }
 
-template <typename E_> constexpr std::size_t num_partials_for_exact(E_ &&e) {
+template <typename E_> consteval std::size_t num_partials_for_exact() {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr<E>::value) {
     using Op = typename E::Op;
     if constexpr (std::is_same_v<std::plus<>, Op> ||
                   std::is_same_v<std::minus<>, Op>) {
-      return num_partials_for_exact(e.lhs()) + num_partials_for_exact(e.rhs());
+      return num_partials_for_exact<typename E::LHS>() +
+             num_partials_for_exact<typename E::RHS>();
     } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
-      auto num_left = num_partials_for_exact(e.lhs());
-      auto num_right = num_partials_for_exact(e.rhs());
+      auto num_left = num_partials_for_exact<typename E::LHS>();
+      auto num_right = num_partials_for_exact<typename E::RHS>();
       return 2 * num_left * num_right;
     } else {
       // always triggers a static assert in a way that doesn't trip up the

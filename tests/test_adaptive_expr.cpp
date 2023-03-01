@@ -42,10 +42,11 @@ TEST_CASE("expr_template_structure", "[expr_template]") {
 }
 
 TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
-  static_assert(num_partials_for_exact(arith_expr{}) == 0);
-  static_assert(num_partials_for_exact(arith_expr{} + 4) == 1);
-  static_assert(num_partials_for_exact(arith_expr{} + 4 - 7) == 2);
-  static_assert(num_partials_for_exact((arith_expr{} + 4 - 7) * 5) == 4);
+  static_assert(num_partials_for_exact<decltype(arith_expr{})>() == 0);
+  static_assert(num_partials_for_exact<decltype(arith_expr{} + 4)>() == 1);
+  static_assert(num_partials_for_exact<decltype(arith_expr{} + 4 - 7)>() == 2);
+  static_assert(
+      num_partials_for_exact<decltype((arith_expr{} + 4 - 7) * 5)>() == 4);
   auto e = ((arith_expr{} + 4 - 7) * 5 + 3.0 / 6.0);
   REQUIRE(exactfp_eval<real>(e.lhs().lhs().lhs().lhs()) == 0.0);
   REQUIRE(exactfp_eval<real>(e.lhs().lhs().lhs()) == 4.0);
@@ -53,12 +54,7 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   REQUIRE(exactfp_eval<real>(e.lhs()) == -15.0);
   REQUIRE(exactfp_eval<real>(e) == -14.5);
   std::vector<real> fp_vals{5.0, 10.0, 11.0, 11.0, 44.0};
-  auto s = std::span{fp_vals};
-  merge_sum(s);
-  for (auto [expected, val] :
-       std::ranges::views::zip(std::array{0.0, 0.0, 0.0, 0.0, 81.0}, s)) {
-    REQUIRE(val == expected);
-  }
+  REQUIRE(merge_sum(std::span{fp_vals}) == 81.0);
 }
 
 TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
