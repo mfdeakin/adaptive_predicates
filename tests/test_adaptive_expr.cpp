@@ -6,6 +6,8 @@
 #include <catch2/generators/catch_generators_random.hpp>
 #include <catch2/generators/catch_generators_range.hpp>
 
+#include <fmt/format.h>
+
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
 
@@ -41,12 +43,36 @@ TEST_CASE("expr_template_structure", "[expr_template]") {
   REQUIRE(fp_eval<real>(e) == -7.25);
 }
 
+// num_partials
+static_assert(num_partials_for_exact<decltype(arith_expr{})>() == 0);
+static_assert(num_partials_for_exact<decltype(arith_expr{} + 4)>() == 1);
+static_assert(num_partials_for_exact<decltype(arith_expr{} + 4 - 7)>() == 2);
+static_assert(num_partials_for_exact<decltype((arith_expr{} + 4 - 7) * 5)>() ==
+              4);
+
+// adaptive relative error bounds
+static_assert(max_rel_error<real, decltype(additive_id{})>() == 0);
+
+static_assert(max_rel_error<real, decltype(arith_expr{})>() ==
+              std::numeric_limits<real>::epsilon() / 2);
+
+static_assert(max_rel_error<real, decltype(arith_expr{} + 4)>() ==
+              std::numeric_limits<real>::epsilon());
+
+static_assert(max_rel_error<real, decltype(arith_expr{} + 4 - 7)>() ==
+              std::numeric_limits<real>::epsilon() * 2);
+
+static_assert(max_rel_error<real, decltype((arith_expr{} + 4 - 7) * 5)>() ==
+              std::numeric_limits<real>::epsilon() * 4);
+
+static_assert(max_rel_error<real, decltype((arith_expr{} + 4 - 7) *
+                                           (arith_expr{} + 5))>() >
+              std::numeric_limits<real>::epsilon() * 4);
+static_assert(max_rel_error<real, decltype((arith_expr{} + 4 - 7) *
+                                           (arith_expr{} + 5))>() <
+              std::numeric_limits<real>::epsilon() * 16);
+
 TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
-  static_assert(num_partials_for_exact<decltype(arith_expr{})>() == 0);
-  static_assert(num_partials_for_exact<decltype(arith_expr{} + 4)>() == 1);
-  static_assert(num_partials_for_exact<decltype(arith_expr{} + 4 - 7)>() == 2);
-  static_assert(
-      num_partials_for_exact<decltype((arith_expr{} + 4 - 7) * 5)>() == 4);
   auto e = ((arith_expr{} + 4 - 7) * 5 + 3.0 / 6.0);
   REQUIRE(exactfp_eval<real>(e.lhs().lhs().lhs().lhs()) == 0.0);
   REQUIRE(exactfp_eval<real>(e.lhs().lhs().lhs()) == 4.0);
@@ -55,6 +81,30 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   REQUIRE(exactfp_eval<real>(e) == -14.5);
   std::vector<real> fp_vals{5.0, 10.0, 11.0, 11.0, 44.0};
   REQUIRE(merge_sum(std::span{fp_vals}) == 81.0);
+
+  // Points used in the orientation expression
+  // These points require adaptive evaluation of the determinant for the
+  // orientation result to be correct when real=float
+  constexpr std::size_t x = 0;
+  constexpr std::size_t y = 1;
+  std::array<std::array<real, 2>, 3> points{
+      std::array<real, 2>{-0.257641255855560303, 0.282396793365478516},
+      std::array<real, 2>{-0.734969973564147949, 0.716774165630340576},
+      std::array<real, 2>{0.48675835132598877, -0.395019501447677612}};
+
+  using mult_expr = arith_expr<std::multiplies<>, real, real>;
+  const auto build_e = [points]() constexpr {
+    const auto cross_expr = [](const std::array<real, 2> &lhs,
+                               const std::array<real, 2> &rhs) constexpr {
+      return mult_expr{lhs[x], rhs[y]} - mult_expr{lhs[y], rhs[x]};
+    };
+    return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
+           cross_expr(points[0], points[1]);
+  };
+
+  const real result =
+      exactfp_eval<real>(build_e()); // The exact answer is -9.392445044e-8
+  REQUIRE(result < 0.0);
 }
 
 TEST_CASE("BenchmarkDeterminant", "[benchmark]") {

@@ -29,7 +29,59 @@ constexpr eval_type fp_eval(E_ &&e) noexcept {
 }
 
 template <std::floating_point eval_type>
-eval_type merge_sum(std::span<eval_type> storage);
+eval_type merge_sum1(std::span<eval_type> storage);
+template <std::floating_point eval_type>
+eval_type merge_sum2(std::span<eval_type> storage);
+template <std::floating_point eval_type>
+eval_type merge_sum3(std::span<eval_type> storage);
+template <std::floating_point eval_type>
+eval_type merge_sum4(std::span<eval_type> storage);
+template <std::floating_point eval_type>
+eval_type merge_sum5(std::span<eval_type> storage);
+
+template <std::floating_point eval_type>
+eval_type merge_sum(std::span<eval_type> storage) {
+  return merge_sum5(storage);
+}
+
+template <std::floating_point eval_type, typename E>
+  requires expr_type<E> || arith_number<E>
+consteval eval_type max_rel_error() {
+  if constexpr (is_expr<E>::value) {
+    using Op = typename E::Op;
+    const eval_type max_left = max_rel_error<eval_type, typename E::LHS>();
+    const eval_type max_right = max_rel_error<eval_type, typename E::RHS>();
+    const eval_type eps = std::numeric_limits<eval_type>::epsilon();
+    if constexpr (std::is_same_v<std::plus<>, Op> ||
+                  std::is_same_v<std::minus<>, Op>) {
+      // For plus and minus, this only applies to their adaptive implementation;
+      // using the basic floating point plus and minus of course has unbounded
+      // relative error
+      if(max_left == 0 && max_right == 0) {
+        return eps / 2;
+      } else {
+        return std::max(max_left, max_right) * 2.0;
+      }
+    } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
+      if (max_left == 0 && max_right == 0) {
+        return eps / 2;
+      } else if (max_left == 0) {
+        return max_right * 2;
+      } else if (max_right == 0) {
+        return max_left * 2;
+      } else {
+        return (eps / 2 + 2 * max_left + 2 * max_right + max_left * max_right);
+      }
+    } else {
+      static_assert(std::is_same_v<std::plus<>, Op> ||
+                    std::is_same_v<std::minus<>, Op> ||
+                    std::is_same_v<std::multiplies<>, Op>);
+      return std::numeric_limits<eval_type>::signaling_NaN();
+    }
+  } else {
+    return 0;
+  }
+}
 
 // Exact, non-adaptive implementation; incredibly slow and meant for testing; 5
 // point in-sphere test takes 2880 fp values to store the result...
@@ -38,22 +90,21 @@ template <std::floating_point eval_type, typename E>
 constexpr eval_type exactfp_eval(E &&e) noexcept {
   if constexpr (is_expr<std::remove_reference_t<E>>::value) {
     auto partial_results = []() {
-      constexpr std::size_t max_stack_storage = 512;
+      constexpr std::size_t max_stack_storage = 1024 / sizeof(eval_type);
       constexpr std::size_t storage_needed = num_partials_for_exact<E>();
       if constexpr (storage_needed > max_stack_storage) {
-        return std::vector<eval_type>(storage_needed, eval_type(0));
+        return std::vector<eval_type>(storage_needed);
       } else {
         auto arr = std::array<eval_type, storage_needed>{};
-        std::ranges::fill(arr, eval_type(0));
         return arr;
       }
     }();
     exactfp_eval_impl<eval_type>(
         std::forward<E>(e),
         std::span{partial_results.begin(), partial_results.end()});
-    // return merge_sum(std::span<eval_type>{partial_results});
-    return std::accumulate(partial_results.begin(), partial_results.end(),
-                           eval_type(0));
+    return merge_sum(std::span<eval_type>{partial_results});
+    // return std::accumulate(partial_results.begin(), partial_results.end(),
+    // eval_type(0));
   } else {
     return static_cast<eval_type>(e);
   }
@@ -78,12 +129,9 @@ exactfp_eval_impl(E_ &&e, std::span<eval_type> partial_results) noexcept {
         partial_results.subspan(reserve_left, reserve_right);
     exactfp_eval_impl<eval_type>(e.rhs(), storage_right);
     using Op = typename E::Op;
-    if constexpr (std::is_same_v<std::plus<>, Op> ||
-                  std::is_same_v<std::minus<>, Op>) {
-      if constexpr (std::is_same_v<std::minus<>, Op>) {
-        for (eval_type &v : storage_right) {
-          v = -v;
-        }
+    if constexpr (std::is_same_v<std::minus<>, Op>) {
+      for (eval_type &v : storage_right) {
+        v = -v;
       }
     } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
       const auto storage_mult = partial_results.last(
@@ -96,6 +144,11 @@ exactfp_eval_impl(E_ &&e, std::span<eval_type> partial_results) noexcept {
 }
 
 template <std::floating_point eval_type>
+constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
+                                                     const eval_type &rhs);
+
+// Requires |lhs| >= |rhs|
+template <std::floating_point eval_type>
 constexpr std::pair<eval_type, eval_type>
 dekker_sum_unchecked(const eval_type &lhs, const eval_type &rhs);
 
@@ -104,15 +157,62 @@ constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
                                                     const eval_type &rhs);
 
 template <std::floating_point eval_type>
-eval_type merge_sum(std::span<eval_type> storage) {
+eval_type merge_sum1(std::span<eval_type> storage) {
+  if (storage.size() > 1) {
+    auto [Q, _] = dekker_sum(storage[0], storage[1]);
+    for (auto g : storage | std::views::drop(2)) {
+      std::tie(Q, _) = dekker_sum(g, Q);
+    }
+    return Q;
+  } else if (storage.size() == 1) {
+    return storage[0];
+  } else {
+    return 0.0;
+  }
+}
+
+template <std::floating_point eval_type>
+eval_type merge_sum2(std::span<eval_type> storage) {
+  if (storage.size() > 1) {
+    auto [Q, _] = dekker_sum(storage[0], storage[1]);
+    for (auto g : storage | std::views::drop(2)) {
+      std::tie(Q, _) = knuth_sum(g, Q);
+    }
+    return Q;
+  } else if (storage.size() == 1) {
+    return storage[0];
+  } else {
+    return 0.0;
+  }
+}
+
+template <std::floating_point eval_type>
+eval_type merge_sum3(std::span<eval_type> storage) {
   if (storage.size() > 1) {
     std::ranges::sort(storage, [](eval_type l, eval_type r) {
       return std::abs(l) < std::abs(r);
     });
-    auto [Q, q] = dekker_sum_unchecked(storage[0], storage[1]);
-    for (auto [g, t] :
-         std::ranges::views::zip(storage | std::views::drop(2), storage)) {
-      const auto [R, h] = dekker_sum_unchecked(g, q);
+    auto [Q, _] = dekker_sum_unchecked(storage[0], storage[1]);
+    for (auto g : storage | std::views::drop(2)) {
+      std::tie(Q, _) = dekker_sum_unchecked(g, Q);
+    }
+    return Q;
+  } else if (storage.size() == 1) {
+    return storage[0];
+  } else {
+    return 0.0;
+  }
+}
+
+template <std::floating_point eval_type>
+eval_type merge_sum4(std::span<eval_type> storage) {
+  if (storage.size() > 1) {
+    std::ranges::sort(storage, [](eval_type l, eval_type r) {
+      return std::abs(l) > std::abs(r);
+    });
+    auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
+    for (auto g : storage | std::views::drop(2)) {
+      auto [R, _] = dekker_sum_unchecked(g, q);
       std::tie(Q, q) = knuth_sum(Q, R);
     }
     return Q;
@@ -124,17 +224,27 @@ eval_type merge_sum(std::span<eval_type> storage) {
 }
 
 template <std::floating_point eval_type>
-eval_type merge_sum_fast(std::span<eval_type> storage) {
+eval_type merge_sum5_append(std::span<eval_type> storage, eval_type v) {
+  for (auto &e : storage) {
+    std::tie(v, e) = knuth_sum(v, e);
+  }
+  return v;
+}
+
+template <std::floating_point eval_type>
+eval_type merge_sum5(std::span<eval_type> storage) {
   if (storage.size() > 1) {
-    std::ranges::sort(storage, [](eval_type l, eval_type r) {
-      return std::abs(l) < std::abs(r);
-    });
-    auto [Q, q] = dekker_sum_unchecked(storage[0], storage[1]);
-    for (auto [g, t] :
-         std::ranges::views::zip(storage | std::views::drop(2), storage)) {
-      std::tie(Q, t) = knuth_sum(Q, g);
+    for (std::size_t i = 1, j = 1; i < storage.size(); ++i) {
+      storage[i] = merge_sum5_append(storage.first(j), storage[i]);
+      if (storage[i] != eval_type(0)) {
+        if (i != j) {
+          storage[j] = storage[i];
+          storage[i] = eval_type(0);
+        }
+        ++j;
+      }
     }
-    return Q;
+    return *(storage.end() - 1);
   } else if (storage.size() == 1) {
     return storage[0];
   } else {
@@ -169,6 +279,26 @@ void sparse_mult(std::span<eval_type> storage_left,
       *out_i = lower;
       --out_i;
     }
+  }
+}
+
+template <std::floating_point eval_type>
+constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
+                                                     const eval_type &rhs) {
+  if (std::abs(lhs) >= std::abs(rhs)) {
+    return dekker_sum_unchecked(lhs, rhs);
+  } else {
+    return dekker_sum_unchecked(rhs, lhs);
+  }
+}
+
+template <std::floating_point eval_type>
+constexpr std::pair<eval_type, eval_type> dekker_sum2(const eval_type &lhs,
+                                                      const eval_type &rhs) {
+  if ((lhs > rhs) == (lhs > -rhs)) {
+    return dekker_sum_unchecked(lhs, rhs);
+  } else {
+    return dekker_sum_unchecked(rhs, lhs);
   }
 }
 
