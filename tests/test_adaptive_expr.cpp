@@ -14,6 +14,7 @@
 #include "shewchuk.h"
 
 using namespace adaptive_expr;
+using namespace _impl;
 
 using real = float;
 
