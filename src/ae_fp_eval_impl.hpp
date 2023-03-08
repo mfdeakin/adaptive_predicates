@@ -59,7 +59,7 @@ std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
 template <std::floating_point eval_type, typename E>
   requires expr_type<E> || arith_number<E>
 consteval eval_type max_rel_error() {
-  if constexpr (is_expr<E>::value) {
+  if constexpr (is_expr_v<E>) {
     using Op = typename E::Op;
     const eval_type max_left = max_rel_error<eval_type, typename E::LHS>();
     const eval_type max_right = max_rel_error<eval_type, typename E::RHS>();
@@ -100,7 +100,7 @@ template <std::floating_point eval_type, typename E_>
 constexpr void
 exactfp_eval_impl(E_ &&e, std::span<eval_type> partial_results) noexcept {
   using E = std::remove_cvref_t<E_>;
-  if constexpr (is_expr<E>::value) {
+  if constexpr (is_expr_v<E>) {
     const std::size_t reserve_left = num_partials_for_exact<typename E::LHS>();
     const auto storage_left = partial_results.first(reserve_left);
     exactfp_eval_impl<eval_type>(e.lhs(), storage_left);

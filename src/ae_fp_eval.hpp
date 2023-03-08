@@ -22,7 +22,7 @@ template <std::floating_point eval_type, typename E_>
   requires expr_type<E_> || arith_number<E_>
 constexpr eval_type fp_eval(E_ &&e) noexcept {
   using E = std::remove_cvref_t<E_>;
-  if constexpr (is_expr<E>::value) {
+  if constexpr (is_expr_v<E>) {
     using Op = typename E::Op;
     return Op()(fp_eval<eval_type>(e.lhs()), fp_eval<eval_type>(e.rhs()));
   } else {
@@ -33,7 +33,7 @@ constexpr eval_type fp_eval(E_ &&e) noexcept {
 template <std::floating_point eval_type, typename E>
   requires expr_type<E> || arith_number<E>
 constexpr eval_type exactfp_eval(E &&e) noexcept {
-  if constexpr (is_expr<std::remove_reference_t<E>>::value) {
+  if constexpr (is_expr_v<std::remove_reference_t<E>>) {
     auto partial_results = []() {
       constexpr std::size_t max_stack_storage = 1024 / sizeof(eval_type);
       constexpr std::size_t storage_needed = num_partials_for_exact<E>();

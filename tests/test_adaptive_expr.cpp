@@ -18,12 +18,12 @@ using namespace _impl;
 
 using real = float;
 
-static_assert(is_expr<arith_expr<std::plus<>, real, real>>::value);
-static_assert(is_expr<const arith_expr<std::plus<>, real, real>>::value);
-static_assert(is_expr<arith_expr<std::plus<>, real, real> &>::value);
-static_assert(is_expr<const arith_expr<std::plus<>, real, real> &>::value);
-static_assert(is_expr<arith_expr<std::plus<>, real, real> &&>::value);
-static_assert(is_expr<const arith_expr<std::plus<>, real, real> &&>::value);
+static_assert(is_expr_v<arith_expr<std::plus<>, real, real>>);
+static_assert(is_expr_v<const arith_expr<std::plus<>, real, real>>);
+static_assert(is_expr_v<arith_expr<std::plus<>, real, real> &>);
+static_assert(is_expr_v<const arith_expr<std::plus<>, real, real> &>);
+static_assert(is_expr_v<arith_expr<std::plus<>, real, real> &&>);
+static_assert(is_expr_v<const arith_expr<std::plus<>, real, real> &&>);
 
 TEST_CASE("expr_template_structure", "[expr_template]") {
   auto e = ((arith_expr{} + 4 - 7) * 5 + 3.0 / 6.0) / 2;

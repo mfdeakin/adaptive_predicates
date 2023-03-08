@@ -46,6 +46,7 @@ template <typename Op, typename LHS, typename RHS>
 struct is_expr_impl<arith_expr<Op, LHS, RHS>> : std::true_type {};
 
 template <typename E> using is_expr = is_expr_impl<std::remove_cvref_t<E>>;
+template <typename E> static constexpr bool is_expr_v = is_expr<E>::value;
 
 template <typename E>
 concept expr_type =
@@ -116,65 +117,6 @@ template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
 constexpr auto operator==(const LHS &lhs, const RHS &rhs) {
   return arith_expr<std::equal_to<>, LHS, RHS>(lhs, rhs);
-}
-
-//
-// io-operators
-//
-
-std::ostream &operator<<(std::ostream &os, const additive_id &e) {
-  return (os << "0");
-}
-
-template <typename Op, typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os, const arith_expr<Op, LHS, RHS> &e);
-
-template <typename RHS>
-std::ostream &operator<<(std::ostream &os,
-                         const arith_expr<std::minus<>, additive_id, RHS> &e) {
-  return os << "-" << e.rhs();
-}
-
-template <typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os,
-                         const arith_expr<std::plus<>, LHS, RHS> &e) {
-  return os << "(" << e.lhs() << " + " << e.rhs() << ")";
-}
-
-template <typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os,
-                         const arith_expr<std::minus<>, LHS, RHS> &e) {
-  return os << "(" << e.lhs() << " - " << e.rhs() << ")";
-}
-
-template <typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os,
-                         const arith_expr<std::multiplies<>, LHS, RHS> &e) {
-  return os << "(" << e.lhs() << " * " << e.rhs() << ")";
-}
-
-template <typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os,
-                         const arith_expr<std::divides<>, LHS, RHS> &e) {
-  return os << "(" << e.lhs() << " / " << e.rhs() << ")";
-}
-
-template <typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os,
-                         const arith_expr<std::less<>, LHS, RHS> &e) {
-  return os << "(" << e.lhs() << " < " << e.rhs() << ")";
-}
-
-template <typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os,
-                         const arith_expr<std::less_equal<>, LHS, RHS> &e) {
-  return os << "(" << e.lhs() << " <= " << e.rhs() << ")";
-}
-
-template <typename LHS, typename RHS>
-std::ostream &operator<<(std::ostream &os,
-                         const arith_expr<std::equal_to<>, LHS, RHS> &e) {
-  return os << "(" << e.lhs() << " == " << e.rhs() << ")";
 }
 
 } // namespace adaptive_expr
