@@ -25,8 +25,8 @@ public:
   constexpr auto &operator()() { return *this; }
 
 private:
-  LHS m_lhs;
-  RHS m_rhs;
+  [[no_unique_address]] LHS m_lhs;
+  [[no_unique_address]] RHS m_rhs;
 };
 
 class additive_id {

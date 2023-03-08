@@ -82,23 +82,30 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   REQUIRE(exactfp_eval<real>(e) == -14.5);
   std::vector<real> fp_vals{5.0, 10.0, 11.0, 11.0, 44.0};
   REQUIRE(merge_sum(std::span{fp_vals}) == 81.0);
-
-  // Points used in the orientation expression
-  // These points require adaptive evaluation of the determinant for the
-  // orientation result to be correct when real=float
-  constexpr std::size_t x = 0;
-  constexpr std::size_t y = 1;
-  std::array<std::array<real, 2>, 3> points{
-      std::array<real, 2>{-0.257641255855560303, 0.282396793365478516},
-      std::array<real, 2>{-0.734969973564147949, 0.716774165630340576},
-      std::array<real, 2>{0.48675835132598877, -0.395019501447677612}};
+  REQUIRE(correct_eval<real>(e));
+  REQUIRE(!correct_eval<real>(e + 14.5));
+  REQUIRE(*correct_eval<real>(e.lhs().lhs().lhs().lhs()) == 0.0);
+  REQUIRE(*correct_eval<real>(e.lhs().lhs().lhs()) == 4.0);
+  REQUIRE(*correct_eval<real>(e.lhs().lhs()) == -3.0);
+  REQUIRE(*correct_eval<real>(e.lhs()) == -15.0);
+  REQUIRE(*correct_eval<real>(e) == -14.5);
 
   using mult_expr = arith_expr<std::multiplies<>, real, real>;
-  const auto build_e = [points]() constexpr {
+  const auto build_e = []() constexpr {
+    constexpr std::size_t x = 0;
+    constexpr std::size_t y = 1;
     const auto cross_expr = [](const std::array<real, 2> &lhs,
                                const std::array<real, 2> &rhs) constexpr {
       return mult_expr{lhs[x], rhs[y]} - mult_expr{lhs[y], rhs[x]};
     };
+
+    // Points used in the orientation expression
+    // These points require adaptive evaluation of the determinant for the
+    // orientation result to be correct when real=float
+    std::array<std::array<real, 2>, 3> points{
+        std::array<real, 2>{-0.257641255855560303, 0.282396793365478516},
+        std::array<real, 2>{-0.734969973564147949, 0.716774165630340576},
+        std::array<real, 2>{0.48675835132598877, -0.395019501447677612}};
     return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
            cross_expr(points[0], points[1]);
   };
@@ -106,6 +113,8 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   const real result =
       exactfp_eval<real>(build_e()); // The exact answer is -9.392445044e-8
   REQUIRE(result < 0.0);
+
+  REQUIRE(!correct_eval<real>(build_e()));
 }
 
 TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
