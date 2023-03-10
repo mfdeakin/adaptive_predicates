@@ -66,19 +66,25 @@ template <std::floating_point eval_type, typename E_>
 constexpr std::optional<eval_type> correct_eval(E_ &&e) noexcept {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr_v<E>) {
+    const eval_type max_result_rel_err = _impl::max_rel_error<eval_type, E>();
     const auto left_opt = correct_eval<eval_type>(e.lhs());
     const auto right_opt = correct_eval<eval_type>(e.rhs());
-    if (!left_opt || !right_opt) {
+    // Make sure that the result can be evaulated correctly
+    // Ensuring that at least the sign of the final answer can be determined,
+    // with some wiggle room for floating point error, and that left and right
+    // have been evaluated correctly
+    if (max_result_rel_err >= 1.0 - 0.001 || !left_opt || !right_opt) {
       return std::nullopt;
     }
     const auto left = *left_opt;
     const auto right = *right_opt;
     using Op = typename E::Op;
-    const eval_type max_left_rel_err = _impl::max_rel_error<eval_type, typename E::LHS>();
-    const eval_type max_right_rel_err = _impl::max_rel_error<eval_type, typename E::RHS>();
+    const eval_type max_left_rel_err =
+        _impl::max_rel_error<eval_type, typename E::LHS>();
+    const eval_type max_right_rel_err =
+        _impl::max_rel_error<eval_type, typename E::RHS>();
 
     const eval_type result = Op()(left, right);
-    const eval_type max_result_rel_err = _impl::max_rel_error<eval_type, E>();
     if constexpr (std::is_same_v<Op, std::plus<>> ||
                   std::is_same_v<Op, std::minus<>>) {
       const eval_type max_err = (max_left_rel_err * std::abs(left) +

@@ -191,27 +191,35 @@ eval_type merge_sum4(std::span<eval_type> storage) {
 }
 
 template <std::floating_point eval_type>
-eval_type merge_sum5_append(std::span<eval_type> storage, eval_type v) {
+auto merge_sum5_append(std::span<eval_type> storage, eval_type v) {
+  auto out = storage.begin();
   for (auto &e : storage) {
-    std::tie(v, e) = knuth_sum(v, e);
+    const auto [result, error] = knuth_sum(v, e);
+    e = std::numeric_limits<eval_type>::signaling_NaN();
+    v = result;
+    if (error) {
+      *out = error;
+      ++out;
+    }
   }
-  return v;
+  return std::pair{out, v};
 }
 
 template <std::floating_point eval_type>
 eval_type merge_sum5(std::span<eval_type> storage) {
   if (storage.size() > 1) {
-    for (std::size_t i = 1, j = 1; i < storage.size(); ++i) {
-      storage[i] = merge_sum5_append(storage.first(j), storage[i]);
-      if (storage[i] != eval_type(0)) {
-        if (i != j) {
-          storage[j] = storage[i];
-          storage[i] = eval_type(0);
-        }
-        ++j;
+    auto out = storage.begin();
+    for (eval_type &inp : storage) {
+      eval_type v = inp;
+      inp = std::numeric_limits<eval_type>::signaling_NaN();
+      auto [new_out, result] = merge_sum5_append(std::span{storage.begin(), out}, v);
+      out = new_out;
+      if(result) {
+        *out = result;
+        ++out;
       }
     }
-    return *(storage.end() - 1);
+    return *(out - 1);
   } else if (storage.size() == 1) {
     return storage[0];
   } else {
