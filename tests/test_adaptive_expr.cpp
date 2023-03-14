@@ -44,6 +44,48 @@ TEST_CASE("expr_template_structure", "[expr_template]") {
   REQUIRE(fp_eval<real>(e) == -7.25);
 }
 
+class constructor_test {
+public:
+  class copy_ref_ex {};
+  class move_ex {};
+  constructor_test() = default;
+  constructor_test(const constructor_test &) { throw copy_ref_ex{}; }
+  constructor_test(constructor_test &&) { throw move_ex{}; }
+  constructor_test operator=(const constructor_test &) { return *this; }
+};
+
+TEST_CASE("expr_template_construction", "[expr_template]") {
+  using E = arith_expr<std::plus<>, constructor_test, constructor_test>;
+  CHECK_THROWS_AS((E{constructor_test{}, constructor_test{}}),
+                  constructor_test::move_ex);
+  constructor_test c1;
+  constructor_test c2;
+  CHECK_THROWS_AS((E{c1, c2}), constructor_test::copy_ref_ex);
+
+  CHECK_THROWS_AS(E{} + E{}, constructor_test::move_ex);
+  CHECK_THROWS_AS(E{} - E{}, constructor_test::move_ex);
+  CHECK_THROWS_AS(E{} * E{}, constructor_test::move_ex);
+  CHECK_THROWS_AS(E{} / E{}, constructor_test::move_ex);
+  CHECK_THROWS_AS(E{} < E{}, constructor_test::move_ex);
+  CHECK_THROWS_AS(E{} <= E{}, constructor_test::move_ex);
+  CHECK_THROWS_AS(E{} == E{}, constructor_test::move_ex);
+  CHECK_THROWS_AS(E{} > E{}, constructor_test::move_ex);
+  CHECK_THROWS_AS(E{} >= E{}, constructor_test::move_ex);
+
+  REQUIRE_NOTHROW(E{});
+  E e1;
+  E e2;
+  CHECK_THROWS_AS(e1 + e2, constructor_test::copy_ref_ex);
+  CHECK_THROWS_AS(e1 - e2, constructor_test::copy_ref_ex);
+  CHECK_THROWS_AS(e1 * e2, constructor_test::copy_ref_ex);
+  CHECK_THROWS_AS(e1 / e2, constructor_test::copy_ref_ex);
+  CHECK_THROWS_AS(e1 < e2, constructor_test::copy_ref_ex);
+  CHECK_THROWS_AS(e1 <= e2, constructor_test::copy_ref_ex);
+  CHECK_THROWS_AS(e1 == e2, constructor_test::copy_ref_ex);
+  CHECK_THROWS_AS(e1 > e2, constructor_test::copy_ref_ex);
+  CHECK_THROWS_AS(e1 >= e2, constructor_test::copy_ref_ex);
+}
+
 // num_partials
 static_assert(num_partials_for_exact<decltype(arith_expr{})>() == 0);
 static_assert(num_partials_for_exact<decltype(arith_expr{} + 4)>() == 1);

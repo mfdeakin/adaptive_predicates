@@ -16,8 +16,10 @@ public:
 
   constexpr arith_expr() : m_lhs(), m_rhs() {}
 
-  constexpr arith_expr(const LHS_ &lhs, const RHS_ &rhs)
+  constexpr arith_expr(const LHS &lhs, const RHS &rhs)
       : m_lhs(lhs), m_rhs(rhs) {}
+  constexpr arith_expr(LHS &&lhs, RHS &&rhs)
+      : m_lhs(std::move(lhs)), m_rhs(std::move(rhs)) {}
 
   constexpr auto &lhs() const noexcept { return m_lhs; }
   constexpr auto &rhs() const noexcept { return m_rhs; }
@@ -67,56 +69,63 @@ template <expr_type E> constexpr auto operator-(const E &expr) {
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
-constexpr auto operator+(const LHS &lhs, const RHS &rhs) {
-  return arith_expr<std::plus<>, LHS, RHS>(lhs, rhs);
+constexpr auto operator+(LHS &&lhs, RHS &&rhs) {
+  return arith_expr<std::plus<>, LHS, RHS>(std::forward<LHS>(lhs),
+                                           std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
-constexpr auto operator-(const LHS &lhs, const RHS &rhs) {
-  return arith_expr<std::minus<>, LHS, RHS>(lhs, rhs);
+constexpr auto operator-(LHS &&lhs, RHS &&rhs) {
+  return arith_expr<std::minus<>, LHS, RHS>(std::forward<LHS>(lhs),
+                                            std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
-constexpr auto operator*(const LHS &lhs, const RHS &rhs) {
-  return arith_expr<std::multiplies<>, LHS, RHS>(lhs, rhs);
+constexpr auto operator*(LHS &&lhs, RHS &&rhs) {
+  return arith_expr<std::multiplies<>, LHS, RHS>(std::forward<LHS>(lhs),
+                                                 std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
-constexpr auto operator/(const LHS &lhs, const RHS &rhs) {
-  return arith_expr<std::divides<>, LHS, RHS>(lhs, rhs);
+constexpr auto operator/(LHS &&lhs, RHS &&rhs) {
+  return arith_expr<std::divides<>, LHS, RHS>(std::forward<LHS>(lhs),
+                                              std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
-constexpr auto operator<(const LHS &lhs, const RHS &rhs) {
-  return arith_expr<std::less<>, LHS, RHS>(lhs, rhs);
+constexpr auto operator<(LHS &&lhs, RHS &&rhs) {
+  return arith_expr<std::less<>, LHS, RHS>(std::forward<LHS>(lhs),
+                                           std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
-constexpr auto operator>(const LHS &lhs, const RHS &rhs) {
-  return rhs < lhs;
+constexpr auto operator>(LHS &&lhs, RHS &&rhs) {
+  return std::forward<RHS>(rhs) < std::forward<LHS>(lhs);
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
-constexpr auto operator<=(const LHS &lhs, const RHS &rhs) {
-  return arith_expr<std::less_equal<>, LHS, RHS>(lhs, rhs);
+constexpr auto operator<=(LHS &&lhs, RHS &&rhs) {
+  return arith_expr<std::less_equal<>, LHS, RHS>(std::forward<LHS>(lhs),
+                                                 std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
-constexpr auto operator>=(const LHS &lhs, const RHS &rhs) {
-  return rhs <= lhs;
+constexpr auto operator>=(LHS &&lhs, RHS &&rhs) {
+  return std::forward<RHS>(rhs) <= std::forward<LHS>(lhs);
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
-constexpr auto operator==(const LHS &lhs, const RHS &rhs) {
-  return arith_expr<std::equal_to<>, LHS, RHS>(lhs, rhs);
+constexpr auto operator==(LHS &&lhs, RHS &&rhs) {
+  return arith_expr<std::equal_to<>, LHS, RHS>(std::forward<LHS>(lhs),
+                                               std::forward<RHS>(rhs));
 }
 
 } // namespace adaptive_expr
