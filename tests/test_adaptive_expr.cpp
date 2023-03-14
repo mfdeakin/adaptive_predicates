@@ -86,6 +86,116 @@ TEST_CASE("expr_template_construction", "[expr_template]") {
   CHECK_THROWS_AS(e1 >= e2, constructor_test::copy_ref_ex);
 }
 
+// expression rewriting
+static_assert(
+    std::is_same_v<
+        std::invoke_result_t<decltype(trim_expr<additive_id>), additive_id>,
+        additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} + additive_id{})>),
+                  decltype(additive_id{} + additive_id{})>,
+              additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} - additive_id{})>),
+                  decltype(additive_id{} - additive_id{})>,
+              additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} * additive_id{})>),
+                  decltype(additive_id{} * additive_id{})>,
+              additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} + additive_id{} +
+                                              additive_id{})>),
+                  decltype(additive_id{} + additive_id{} + additive_id{})>,
+              additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} + additive_id{} -
+                                              additive_id{})>),
+                  decltype(additive_id{} + additive_id{} - additive_id{})>,
+              additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} - additive_id{} +
+                                              additive_id{})>),
+                  decltype(additive_id{} - additive_id{} + additive_id{})>,
+              additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} - additive_id{} -
+                                              additive_id{})>),
+                  decltype(additive_id{} - additive_id{} - additive_id{})>,
+              additive_id>);
+
+static_assert(std::is_same_v<
+              std::invoke_result_t<decltype(trim_expr<real>), real>, real>);
+static_assert(
+    std::is_same_v<std::invoke_result_t<
+                       decltype(trim_expr<decltype(additive_id{} + real{})>),
+                       decltype(additive_id{} + real{})>,
+                   real>);
+static_assert(
+    std::is_same_v<std::invoke_result_t<
+                       decltype(trim_expr<decltype(additive_id{} - real{})>),
+                       decltype(additive_id{} - real{})>,
+                   decltype(additive_id{} - real{})>);
+static_assert(
+    std::is_same_v<std::invoke_result_t<
+                       decltype(trim_expr<decltype(additive_id{} * real{})>),
+                       decltype(additive_id{} * real{})>,
+                   additive_id>);
+
+static_assert(
+    std::is_same_v<std::invoke_result_t<
+                       decltype(trim_expr<decltype(real{} + additive_id{})>),
+                       decltype(real{} + additive_id{})>,
+                   real>);
+static_assert(
+    std::is_same_v<std::invoke_result_t<
+                       decltype(trim_expr<decltype(real{} - additive_id{})>),
+                       decltype(real{} - additive_id{})>,
+                   real>);
+static_assert(
+    std::is_same_v<std::invoke_result_t<
+                       decltype(trim_expr<decltype(real{} * additive_id{})>),
+                       decltype(real{} * additive_id{})>,
+                   additive_id>);
+
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} + additive_id{} +
+                                              additive_id{})>),
+                  decltype(additive_id{} + additive_id{} + additive_id{})>,
+              additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} + additive_id{} -
+                                              additive_id{})>),
+                  decltype(additive_id{} + additive_id{} - additive_id{})>,
+              additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} - additive_id{} +
+                                              additive_id{})>),
+                  decltype(additive_id{} - additive_id{} + additive_id{})>,
+              additive_id>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<
+                  decltype(trim_expr<decltype(additive_id{} - additive_id{} -
+                                              additive_id{})>),
+                  decltype(additive_id{} - additive_id{} - additive_id{})>,
+              additive_id>);
+
+TEST_CASE("expr_template_trim", "[expr_template_rewrite]") {
+  REQUIRE(trim_expr(additive_id{} + 5) == 5);
+  REQUIRE(fp_eval<real>(trim_expr(additive_id{} - real(5))) == real(-5));
+  REQUIRE(fp_eval<real>(balance_expr(additive_id{} - real(5))) == real(-5));
+}
+
 // num_partials
 static_assert(num_partials_for_exact<decltype(arith_expr{})>() == 0);
 static_assert(num_partials_for_exact<decltype(arith_expr{} + 4)>() == 1);

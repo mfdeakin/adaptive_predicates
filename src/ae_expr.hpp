@@ -14,7 +14,7 @@ public:
   using RHS = std::remove_cvref_t<RHS_>;
   using Op = std::remove_cvref_t<Op_>;
 
-  constexpr arith_expr() : m_lhs(), m_rhs() {}
+  constexpr arith_expr() = default;
 
   constexpr arith_expr(const LHS &lhs, const RHS &rhs)
       : m_lhs(lhs), m_rhs(rhs) {}
@@ -52,7 +52,12 @@ template <typename E> static constexpr bool is_expr_v = is_expr<E>::value;
 
 template <typename E>
 concept expr_type =
-    is_expr<E>::value || std::is_same_v<additive_id, std::remove_cvref_t<E>>;
+    is_expr_v<E> || std::is_same_v<additive_id, std::remove_cvref_t<E>>;
+
+template <typename E>
+concept negate_expr_type =
+    is_expr_v<E> && std::is_same_v<typename E::Op, std::minus<>> &&
+    std::is_same_v<typename E::LHS, additive_id>;
 
 template <typename T>
 concept arith_number = std::signed_integral<std::remove_cvref_t<T>> ||
@@ -70,36 +75,41 @@ template <expr_type E> constexpr auto operator-(const E &expr) {
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
 constexpr auto operator+(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::plus<>, LHS, RHS>(std::forward<LHS>(lhs),
-                                           std::forward<RHS>(rhs));
+  return arith_expr<std::plus<>, std::remove_cvref_t<LHS>,
+                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
+                                              std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
 constexpr auto operator-(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::minus<>, LHS, RHS>(std::forward<LHS>(lhs),
-                                            std::forward<RHS>(rhs));
+  return arith_expr<std::minus<>, std::remove_cvref_t<LHS>,
+                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
+                                              std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
 constexpr auto operator*(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::multiplies<>, LHS, RHS>(std::forward<LHS>(lhs),
-                                                 std::forward<RHS>(rhs));
+  return arith_expr<std::multiplies<>, std::remove_cvref_t<LHS>,
+                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
+                                              std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
 constexpr auto operator/(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::divides<>, LHS, RHS>(std::forward<LHS>(lhs),
+  return arith_expr<std::divides<>, std::remove_cvref_t<LHS>,
+                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
                                               std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
 constexpr auto operator<(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::less<>, LHS, RHS>(std::forward<LHS>(lhs),
-                                           std::forward<RHS>(rhs));
+  return arith_expr<std::less<>, std::remove_cvref_t<LHS>,
+                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
+                                              std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
@@ -111,8 +121,9 @@ constexpr auto operator>(LHS &&lhs, RHS &&rhs) {
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
 constexpr auto operator<=(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::less_equal<>, LHS, RHS>(std::forward<LHS>(lhs),
-                                                 std::forward<RHS>(rhs));
+  return arith_expr<std::less_equal<>, std::remove_cvref_t<LHS>,
+                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
+                                              std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
@@ -124,8 +135,9 @@ constexpr auto operator>=(LHS &&lhs, RHS &&rhs) {
 template <typename LHS, typename RHS>
   requires arith_expr_operands<LHS, RHS>
 constexpr auto operator==(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::equal_to<>, LHS, RHS>(std::forward<LHS>(lhs),
-                                               std::forward<RHS>(rhs));
+  return arith_expr<std::equal_to<>, std::remove_cvref_t<LHS>,
+                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
+                                              std::forward<RHS>(rhs));
 }
 
 } // namespace adaptive_expr
