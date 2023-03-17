@@ -8,6 +8,7 @@
 
 #include <fmt/format.h>
 
+#include "ae_adaptive_predicate_eval.hpp"
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
 
@@ -194,6 +195,7 @@ TEST_CASE("expr_template_trim", "[expr_template_rewrite]") {
   REQUIRE(trim_expr(additive_id{} + 5) == 5);
   REQUIRE(fp_eval<real>(trim_expr(additive_id{} - real(5))) == real(-5));
   REQUIRE(fp_eval<real>(balance_expr(additive_id{} - real(5))) == real(-5));
+  REQUIRE(fp_eval<real>(balance_expr(additive_id{} - real(5))) == real(-5));
 }
 
 // num_partials
@@ -202,6 +204,49 @@ static_assert(num_partials_for_exact<decltype(arith_expr{} + 4)>() == 1);
 static_assert(num_partials_for_exact<decltype(arith_expr{} + 4 - 7)>() == 2);
 static_assert(num_partials_for_exact<decltype((arith_expr{} + 4 - 7) * 5)>() ==
               4);
+
+// enumerate_branches_functor
+struct branch_token_tag : public branch_token_s {};
+static_assert(
+    std::is_same_v<std::invoke_result_t<
+                       enumerate_branches_functor<branch_token_tag>, float>,
+                   std::tuple<>>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
+                                   arith_expr<std::plus<>, real, real>>,
+              std::tuple<branch_token_tag>>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
+                                   decltype(arith_expr{})>,
+              std::tuple<branch_token_tag>>);
+static_assert(
+    std::is_same_v<
+        std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
+                             decltype(arith_expr{} + 1)>,
+        std::tuple<branch_token_tag, branch_token_left<branch_token_tag>>>);
+static_assert(
+    std::is_same_v<
+        std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
+                             decltype(1 + arith_expr{})>,
+        std::tuple<branch_token_tag, branch_token_right<branch_token_tag>>>);
+static_assert(std::is_same_v<
+              std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
+                                   decltype(arith_expr{} + arith_expr{})>,
+              std::tuple<branch_token_tag, branch_token_left<branch_token_tag>,
+                         branch_token_right<branch_token_tag>>>);
+static_assert(
+    std::is_same_v<
+        std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
+                             decltype((arith_expr{} + arith_expr{}) +
+                                      arith_expr{})>,
+        std::tuple<branch_token_tag, branch_token_left<branch_token_tag>,
+                   branch_token_left<branch_token_left<branch_token_tag>>,
+                   branch_token_left<branch_token_right<branch_token_tag>>,
+                   branch_token_right<branch_token_tag>>>);
+
+TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
+  adaptive_eval<decltype(arith_expr{}), real>{};
+}
 
 // adaptive relative error bounds
 static_assert(max_rel_error<real, decltype(additive_id{})>() == 0);

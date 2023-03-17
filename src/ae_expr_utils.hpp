@@ -207,6 +207,70 @@ template <typename E_> consteval std::size_t num_partials_for_exact() {
   }
 }
 
+class branch_token_s {};
+
+template <typename S>
+concept branch_token = std::is_base_of_v<branch_token_s, S>;
+
+template <typename S>
+concept branch_token_inner_node = branch_token<S> && requires(S s) { s.get(); };
+
+template <branch_token S>
+class branch_token_inner_node_s : public branch_token_s {
+public:
+  branch_token_inner_node_s() : s{} {}
+  branch_token_inner_node_s(S _s) : s{_s} {}
+  constexpr auto &get() { return s.get(); }
+
+private:
+  S s;
+};
+
+template <branch_token S>
+class branch_token_left : public branch_token_inner_node_s<S> {
+public:
+  branch_token_left() : branch_token_inner_node_s<S>{} {}
+  branch_token_left(S _s) : branch_token_inner_node_s<S>{_s} {}
+};
+
+template <branch_token S>
+class branch_token_right : public branch_token_inner_node_s<S> {
+public:
+  branch_token_right() : branch_token_inner_node_s<S>{} {}
+  branch_token_right(S _s) : branch_token_inner_node_s<S>{_s} {}
+};
+
+template <typename storage_t> struct apply_strings {
+  template <typename... L, typename... R>
+  auto operator()(std::tuple<L...>, std::tuple<R...>) {
+    if constexpr (sizeof...(L) > 0 && sizeof...(R) > 0) {
+      return std::tuple<storage_t, branch_token_left<L>...,
+                        branch_token_right<R>...>{};
+    } else if constexpr (sizeof...(L) > 0) {
+      return std::tuple<storage_t, branch_token_left<L>...>{};
+    } else if constexpr (sizeof...(R) > 0) {
+      return std::tuple<storage_t, branch_token_right<R>...>{};
+    } else {
+      return std::tuple<storage_t>{};
+    }
+  }
+};
+
+template <typename storage_t> struct enumerate_branches_functor {
+  template <typename E_> constexpr auto operator()(E_ &&e) {
+    using E = std::remove_cvref_t<E_>;
+    if constexpr (is_expr_v<E>) {
+      if constexpr (is_expr_v<typename E::LHS> || is_expr_v<typename E::RHS>) {
+        return apply_strings<storage_t>{}((*this)(e.lhs()), (*this)(e.rhs()));
+      } else {
+        return std::tuple<storage_t>{};
+      }
+    } else {
+      return std::tuple<>{};
+    }
+  }
+};
+
 } // namespace adaptive_expr
 
 #endif // ADAPTIVE_PREDICATES_AE_EXPR_UTILS_HPP
