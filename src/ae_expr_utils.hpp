@@ -231,6 +231,10 @@ class branch_token_left : public branch_token_inner_node_s<S> {
 public:
   branch_token_left() : branch_token_inner_node_s<S>{} {}
   branch_token_left(S _s) : branch_token_inner_node_s<S>{_s} {}
+
+  template <template <class> class branch_dir>
+  using append_branch =
+      branch_token_left<typename S::append_branch<branch_dir>>;
 };
 
 template <branch_token S>
@@ -238,6 +242,10 @@ class branch_token_right : public branch_token_inner_node_s<S> {
 public:
   branch_token_right() : branch_token_inner_node_s<S>{} {}
   branch_token_right(S _s) : branch_token_inner_node_s<S>{_s} {}
+
+  template <template <class> class branch_dir>
+  using append_branch =
+      branch_token_right<typename S::append_branch<branch_dir>>;
 };
 
 template <typename storage_t> struct apply_strings {

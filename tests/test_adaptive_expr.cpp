@@ -206,7 +206,11 @@ static_assert(num_partials_for_exact<decltype((arith_expr{} + 4 - 7) * 5)>() ==
               4);
 
 // enumerate_branches_functor
-struct branch_token_tag : public branch_token_s {};
+struct branch_token_tag : public branch_token_s {
+  template <template <class> class branch_dir>
+  using append_branch = branch_dir<branch_token_tag>;
+};
+
 static_assert(
     std::is_same_v<std::invoke_result_t<
                        enumerate_branches_functor<branch_token_tag>, float>,
@@ -245,7 +249,33 @@ static_assert(
                    branch_token_right<branch_token_tag>>>);
 
 TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
-  adaptive_eval<decltype(arith_expr{}), real>{};
+  REQUIRE((adaptive_eval<decltype(arith_expr{}), real>{}).eval(arith_expr{}) ==
+          0.0);
+  REQUIRE((adaptive_eval<decltype(arith_expr{} + 7.0), real>{})
+              .eval(arith_expr{} + 7.0) == 7.0);
+  REQUIRE((adaptive_eval<decltype((arith_expr{} + 7.0) * 2.0), real>{})
+              .eval((arith_expr{} + 7.0) * 2.0) == 14.0);
+  REQUIRE((adaptive_eval<decltype((arith_expr{} + 7.0) * 2.0 - 14.0), real>{})
+              .eval((arith_expr{} + 7.0) * 2.0 - 14.0) == 0.0);
+
+  constexpr std::size_t x = 0;
+  constexpr std::size_t y = 1;
+  std::array<std::array<real, 2>, 3> points{
+      std::array<real, 2>{-0.257641255855560303, 0.282396793365478516},
+      std::array<real, 2>{-0.734969973564147949, 0.716774165630340576},
+      std::array<real, 2>{0.48675835132598877, -0.395019501447677612}};
+
+  using mult_expr = arith_expr<std::multiplies<>, real, real>;
+  const auto build_e = [points]() constexpr {
+    const auto cross_expr = [](const std::array<real, 2> &lhs,
+                               const std::array<real, 2> &rhs) constexpr {
+      return mult_expr{lhs[x], rhs[y]} - mult_expr{lhs[y], rhs[x]};
+    };
+    return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
+           cross_expr(points[0], points[1]);
+  };
+  // std::tuple<> t = enumerate_branches_functor<branch_token_tag>()(build_e());
+  REQUIRE(adaptive_eval<std::invoke_result_t<decltype(build_e)>, real>{}.eval(build_e()) < 0.0);
 }
 
 // adaptive relative error bounds

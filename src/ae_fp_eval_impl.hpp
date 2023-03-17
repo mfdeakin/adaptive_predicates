@@ -95,6 +95,26 @@ consteval eval_type max_rel_error() {
   }
 }
 
+template <typename Op, arith_number eval_type>
+constexpr std::pair<eval_type, eval_type>
+eval_with_max_abs_err(const eval_type left, const eval_type left_abs_err,
+                     const eval_type right, const eval_type right_abs_err) {
+  const eval_type result = Op()(left, right);
+  if constexpr (std::is_same_v<Op, std::plus<>> ||
+                std::is_same_v<Op, std::minus<>>) {
+    return {result, left_abs_err + right_abs_err +
+                        std::abs(result) *
+                            std::numeric_limits<eval_type>::epsilon() / 2};
+  } else if constexpr (std::is_same_v<Op, std::multiplies<>>) {
+    return {result, right * left_abs_err + left * right_abs_err +
+                        left_abs_err * right_abs_err +
+                        std::abs(result) *
+                            std::numeric_limits<eval_type>::epsilon() / 2};
+  } else {
+    return {result, std::numeric_limits<eval_type>::signaling_NaN()};
+  }
+}
+
 template <std::floating_point eval_type, typename E_>
   requires expr_type<E_> || arith_number<E_>
 constexpr void
@@ -212,9 +232,10 @@ eval_type merge_sum5(std::span<eval_type> storage) {
     for (eval_type &inp : storage) {
       eval_type v = inp;
       inp = std::numeric_limits<eval_type>::signaling_NaN();
-      auto [new_out, result] = merge_sum5_append(std::span{storage.begin(), out}, v);
+      auto [new_out, result] =
+          merge_sum5_append(std::span{storage.begin(), out}, v);
       out = new_out;
-      if(result) {
+      if (result) {
         *out = result;
         ++out;
       }
