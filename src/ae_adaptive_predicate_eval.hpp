@@ -44,7 +44,8 @@ private:
       init_cache<typename branch::append_branch<branch_token_left>, LHS>(
           memory.first(num_partials_for_exact<LHS>()));
       init_cache<typename branch::append_branch<branch_token_right>, RHS>(
-          memory.last(num_partials_for_exact<RHS>()));
+          memory.subspan(num_partials_for_exact<LHS>(),
+                         num_partials_for_exact<typename sub_expr::RHS>()));
     }
   }
 
@@ -59,13 +60,13 @@ private:
     bool computed = false;
   };
 
-  template <typename sub_expr_, branch_token cache_type = branch_token_leaf>
+  template <typename sub_expr_, branch_token branch = branch_token_leaf>
     requires expr_type<sub_expr_> || arith_number<sub_expr_>
   std::pair<eval_type, eval_type> eval_impl(sub_expr_ &&expr) {
     using sub_expr = std::remove_cvref_t<sub_expr_>;
 
     if constexpr (is_expr_v<sub_expr>) {
-      branch_token_leaf &exact_eval_info = std::get<cache_type>(cache).get();
+      branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
       if (exact_eval_info.computed) {
         return {exact_eval_info.result,
                 std::abs(exact_eval_info.result) *
@@ -73,10 +74,12 @@ private:
       }
       using Op = typename sub_expr::Op;
       auto [left_result, left_abs_err] =
-          eval_impl<decltype(expr.lhs()), typename cache_type::append_branch<branch_token_left>>(
+          eval_impl<decltype(expr.lhs()),
+                    typename branch::append_branch<branch_token_left>>(
               expr.lhs());
       auto [right_result, right_abs_err] =
-          eval_impl<decltype(expr.rhs()), typename cache_type::append_branch<branch_token_right>>(
+          eval_impl<decltype(expr.rhs()),
+                    typename branch::append_branch<branch_token_right>>(
               expr.rhs());
       const auto [result, max_abs_err] = _impl::eval_with_max_abs_err<Op>(
           left_result, left_abs_err, right_result, right_abs_err);
@@ -84,8 +87,8 @@ private:
           std::abs(result) *
               eval_type(1.0 -
                         std::numeric_limits<eval_type>::epsilon() * 8.0)) {
-        _impl::exactfp_eval_impl<eval_type>(std::forward<sub_expr_>(expr),
-                                            exact_eval_info.memory);
+        exact_eval<branch>(std::forward<sub_expr_>(expr),
+                                      exact_eval_info.memory);
         const eval_type exact_result = std::reduce(
             exact_eval_info.memory.begin(), exact_eval_info.memory.end());
         exact_eval_info.computed = true;
@@ -98,6 +101,41 @@ private:
       }
     } else {
       return {expr, 0.0};
+    }
+  }
+
+  template <branch_token branch, typename sub_expr_>
+    requires expr_type<sub_expr_> || arith_number<sub_expr_>
+  constexpr void exact_eval(sub_expr_ &&e, std::span<eval_type> partial_results) noexcept {
+    using sub_expr = std::remove_cvref_t<sub_expr_>;
+    if constexpr (is_expr_v<sub_expr>) {
+      branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
+      if (exact_eval_info.computed) {
+        return;
+      }
+      const std::size_t reserve_left =
+          num_partials_for_exact<typename sub_expr::LHS>();
+      const auto storage_left = partial_results.first(reserve_left);
+      exact_eval<typename branch::append_branch<branch_token_left>>(
+          e.lhs(), storage_left);
+      const std::size_t reserve_right =
+          num_partials_for_exact<typename sub_expr::RHS>();
+      const auto storage_right =
+          partial_results.subspan(reserve_left, reserve_right);
+      exact_eval<typename branch::append_branch<branch_token_right>>(
+          e.rhs(), storage_right);
+      using Op = typename sub_expr::Op;
+      if constexpr (std::is_same_v<std::minus<>, Op>) {
+        for (eval_type &v : storage_right) {
+          v = -v;
+        }
+      } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
+        const auto storage_mult = partial_results.last(
+            partial_results.size() - reserve_left - reserve_right);
+        _impl::sparse_mult(storage_left, storage_right, storage_mult);
+      }
+    } else if constexpr (!std::is_same_v<additive_id, sub_expr>) {
+      *partial_results.begin() = eval_type(e);
     }
   }
 

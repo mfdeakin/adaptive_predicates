@@ -274,7 +274,6 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
     return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
            cross_expr(points[0], points[1]);
   };
-  // std::tuple<> t = enumerate_branches_functor<branch_token_tag>()(build_e());
   REQUIRE(adaptive_eval<std::invoke_result_t<decltype(build_e)>, real>{}.eval(build_e()) < 0.0);
 }
 
