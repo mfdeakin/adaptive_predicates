@@ -14,10 +14,12 @@
 
 #include "shewchuk.h"
 
+using real = float;
+
+#include "testing_data.hpp"
+
 using namespace adaptive_expr;
 using namespace _impl;
-
-using real = float;
 
 static_assert(is_expr_v<arith_expr<std::plus<>, real, real>>);
 static_assert(is_expr_v<const arith_expr<std::plus<>, real, real>>);
@@ -258,23 +260,16 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
   REQUIRE((adaptive_eval<decltype((arith_expr{} + 7.0) * 2.0 - 14.0), real>{})
               .eval((arith_expr{} + 7.0) * 2.0 - 14.0) == 0.0);
 
-  constexpr std::size_t x = 0;
-  constexpr std::size_t y = 1;
-  std::array<std::array<real, 2>, 3> points{
-      std::array<real, 2>{-0.257641255855560303, 0.282396793365478516},
-      std::array<real, 2>{-0.734969973564147949, 0.716774165630340576},
-      std::array<real, 2>{0.48675835132598877, -0.395019501447677612}};
-
-  using mult_expr = arith_expr<std::multiplies<>, real, real>;
-  const auto build_e = [points]() constexpr {
-    const auto cross_expr = [](const std::array<real, 2> &lhs,
-                               const std::array<real, 2> &rhs) constexpr {
-      return mult_expr{lhs[x], rhs[y]} - mult_expr{lhs[y], rhs[x]};
-    };
-    return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
-           cross_expr(points[0], points[1]);
-  };
-  REQUIRE(adaptive_eval<std::invoke_result_t<decltype(build_e)>, real>{}.eval(build_e()) < 0.0);
+  std::mt19937_64 gen(std::random_device{}());
+  std::uniform_real_distribution<real> dist(-1.0, 1.0);
+  for (auto [points, expected] : orient2d_cases) {
+    const auto e = build_orient2d_case(points);
+    CHECK(check_sign(expected, fp_eval<real>(e)));
+    CHECK(check_sign(expected, adaptive_eval<decltype(e), real>{}.eval(e)));
+    CHECK(check_sign(expected, exactfp_eval<real>(e)));
+    CHECK(check_sign(expected, orient2d(points[0].data(), points[1].data(),
+                                        points[2].data())));
+  }
 }
 
 // adaptive relative error bounds
@@ -316,72 +311,105 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   REQUIRE(*correct_eval<real>(e.lhs()) == -15.0);
   REQUIRE(*correct_eval<real>(e) == -14.5);
 
-  using mult_expr = arith_expr<std::multiplies<>, real, real>;
-  const auto build_e = []() constexpr {
-    constexpr std::size_t x = 0;
-    constexpr std::size_t y = 1;
-    const auto cross_expr = [](const std::array<real, 2> &lhs,
-                               const std::array<real, 2> &rhs) constexpr {
-      return mult_expr{lhs[x], rhs[y]} - mult_expr{lhs[y], rhs[x]};
-    };
-
-    // Points used in the orientation expression
-    // These points require adaptive evaluation of the determinant for the
-    // orientation result to be correct when real=float
-    std::array<std::array<real, 2>, 3> points{
-        std::array<real, 2>{-0.257641255855560303, 0.282396793365478516},
-        std::array<real, 2>{-0.734969973564147949, 0.716774165630340576},
-        std::array<real, 2>{0.48675835132598877, -0.395019501447677612}};
-    return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
-           cross_expr(points[0], points[1]);
-  };
-
-  const real result =
-      exactfp_eval<real>(build_e()); // The exact answer is -9.392445044e-8
+  const auto points = orient2d_cases[0].first;
+  const real result = exactfp_eval<real>(
+      build_orient2d_case(points)); // The exact answer is -9.392445044e-8
   REQUIRE(result < 0.0);
 
-  REQUIRE(!correct_eval<real>(build_e()));
+  REQUIRE(!correct_eval<real>(build_orient2d_case(points)));
 }
 
 TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   exactinit();
-  // Points used in the orientation expression
-  // These points require adaptive evaluation of the determinant for the
-  // orientation result to be correct when real=float
+  const auto points1 = orient2d_cases[0].first;
   constexpr std::size_t x = 0;
   constexpr std::size_t y = 1;
-  std::array<std::array<real, 2>, 3> points{
-      std::array<real, 2>{-0.257641255855560303, 0.282396793365478516},
-      std::array<real, 2>{-0.734969973564147949, 0.716774165630340576},
-      std::array<real, 2>{0.48675835132598877, -0.395019501447677612}};
-
-  using mult_expr = arith_expr<std::multiplies<>, real, real>;
-  const auto build_e = [points]() constexpr {
-    const auto cross_expr = [](const std::array<real, 2> &lhs,
-                               const std::array<real, 2> &rhs) constexpr {
-      return mult_expr{lhs[x], rhs[y]} - mult_expr{lhs[y], rhs[x]};
-    };
-    return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
-           cross_expr(points[0], points[1]);
+  BENCHMARK("build expr 1") { return build_orient2d_case(points1); };
+  BENCHMARK("no expr floating point 1") {
+    return points1[1][x] * points1[2][y] - points1[1][y] * points1[2][x] -
+           points1[0][x] * points1[2][y] + points1[0][y] * points1[2][x] +
+           points1[0][x] * points1[1][y] - points1[0][y] * points1[1][x];
   };
-  BENCHMARK("build expr") { return build_e(); };
-  BENCHMARK("no expr floating point") {
-    return points[1][x] * points[2][y] - points[1][y] * points[2][x] -
-           points[0][x] * points[2][y] + points[0][y] * points[2][x] +
-           points[0][x] * points[1][y] - points[0][y] * points[1][x];
-  };
-  BENCHMARK("floating point") {
-    const auto e = build_e();
+  BENCHMARK("floating point 1") {
+    const auto e = build_orient2d_case(points1);
     return fp_eval<real>(e);
   };
-  BENCHMARK("exact rounded") {
-    const auto e = build_e();
+  BENCHMARK("correct or nothing 1") {
+    return correct_eval<real>(build_orient2d_case(points1));
+  };
+  BENCHMARK("exact rounded 1") {
+    const auto e = build_orient2d_case(points1);
     return exactfp_eval<real>(e);
   };
-  BENCHMARK("shewchuk floating point") {
-    return orient2dfast(points[0].data(), points[1].data(), points[2].data());
+  BENCHMARK("adaptive 1") {
+    const auto e = build_orient2d_case(points1);
+    return adaptive_eval<decltype(e), real>{}.eval(e);
   };
-  BENCHMARK("shewchuk exact rounded") {
-    return orient2d(points[0].data(), points[1].data(), points[2].data());
+  BENCHMARK("shewchuk floating point 1") {
+    return orient2dfast(points1[0].data(), points1[1].data(),
+                        points1[2].data());
+  };
+  BENCHMARK("shewchuk exact rounded 1") {
+    return orient2d(points1[0].data(), points1[1].data(), points1[2].data());
+  };
+
+  const auto points2 = orient2d_cases[1].first;
+  BENCHMARK("build expr 2") { return build_orient2d_case(points2); };
+  BENCHMARK("no expr floating point 2") {
+    return points2[1][x] * points2[2][y] - points2[1][y] * points2[2][x] -
+           points2[0][x] * points2[2][y] + points2[0][y] * points2[2][x] +
+           points2[0][x] * points2[1][y] - points2[0][y] * points2[1][x];
+  };
+  BENCHMARK("floating point 2") {
+    const auto e = build_orient2d_case(points2);
+    return fp_eval<real>(e);
+  };
+  BENCHMARK("correct or nothing 2") {
+    return correct_eval<real>(build_orient2d_case(points2));
+  };
+  BENCHMARK("exact rounded 2") {
+    const auto e = build_orient2d_case(points2);
+    return exactfp_eval<real>(e);
+  };
+  BENCHMARK("adaptive 2") {
+    const auto e = build_orient2d_case(points2);
+    return adaptive_eval<decltype(e), real>{}.eval(e);
+  };
+  BENCHMARK("shewchuk floating point 2") {
+    return orient2dfast(points2[0].data(), points2[1].data(),
+                        points2[2].data());
+  };
+  BENCHMARK("shewchuk exact rounded 2") {
+    return orient2d(points2[0].data(), points2[1].data(), points2[2].data());
+  };
+
+  const auto points3 = orient2d_cases[15].first;
+  BENCHMARK("build expr 3") { return build_orient2d_case(points3); };
+  BENCHMARK("no expr floating point 3") {
+    return points3[1][x] * points3[2][y] - points3[1][y] * points3[2][x] -
+           points3[0][x] * points3[2][y] + points3[0][y] * points3[2][x] +
+           points3[0][x] * points3[1][y] - points3[0][y] * points3[1][x];
+  };
+  BENCHMARK("floating point 3") {
+    const auto e = build_orient2d_case(points3);
+    return fp_eval<real>(e);
+  };
+  BENCHMARK("correct or nothing 3") {
+    return correct_eval<real>(build_orient2d_case(points3));
+  };
+  BENCHMARK("exact rounded 3") {
+    const auto e = build_orient2d_case(points3);
+    return exactfp_eval<real>(e);
+  };
+  BENCHMARK("adaptive 3") {
+    const auto e = build_orient2d_case(points3);
+    return adaptive_eval<decltype(e), real>{}.eval(e);
+  };
+  BENCHMARK("shewchuk floating point 3") {
+    return orient2dfast(points3[0].data(), points3[1].data(),
+                        points3[2].data());
+  };
+  BENCHMARK("shewchuk exact rounded 3") {
+    return orient2d(points3[0].data(), points3[1].data(), points3[2].data());
   };
 }
