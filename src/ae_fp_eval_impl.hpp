@@ -34,10 +34,10 @@ eval_type merge_sum(std::span<eval_type> storage) {
   return merge_sum5(storage);
 }
 
-template <std::floating_point eval_type>
-void sparse_mult(std::span<eval_type> storage_left,
-                 std::span<eval_type> storage_right,
-                 std::span<eval_type> storage_mult);
+template <std::ranges::range span_l, std::ranges::range span_r,
+          std::ranges::range span_m>
+void sparse_mult(span_l storage_left, span_r storage_right,
+                 span_m storage_mult);
 
 template <std::floating_point eval_type>
 constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
@@ -98,7 +98,7 @@ consteval eval_type max_rel_error() {
 template <typename Op, arith_number eval_type>
 constexpr std::pair<eval_type, eval_type>
 eval_with_max_abs_err(const eval_type left, const eval_type left_abs_err,
-                     const eval_type right, const eval_type right_abs_err) {
+                      const eval_type right, const eval_type right_abs_err) {
   const eval_type result = Op()(left, right);
   if constexpr (std::is_same_v<Op, std::plus<>> ||
                 std::is_same_v<Op, std::minus<>>) {
@@ -115,18 +115,19 @@ eval_with_max_abs_err(const eval_type left, const eval_type left_abs_err,
   }
 }
 
-template <std::floating_point eval_type, typename E_>
+template <std::floating_point eval_type, typename E_, std::ranges::range span_t>
   requires expr_type<E_> || arith_number<E_>
-constexpr void
-exactfp_eval_impl(E_ &&e, std::span<eval_type> partial_results) noexcept {
+constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr_v<E>) {
-    const std::size_t reserve_left = num_partials_for_exact<typename E::LHS>();
-    const auto storage_left = partial_results.first(reserve_left);
+    constexpr std::size_t reserve_left =
+        num_partials_for_exact<typename E::LHS>();
+    const auto storage_left = partial_results.template first<reserve_left>();
     exactfp_eval_impl<eval_type>(e.lhs(), storage_left);
-    const std::size_t reserve_right = num_partials_for_exact<typename E::RHS>();
+    constexpr std::size_t reserve_right =
+        num_partials_for_exact<typename E::RHS>();
     const auto storage_right =
-        partial_results.subspan(reserve_left, reserve_right);
+        partial_results.template subspan<reserve_left, reserve_right>();
     exactfp_eval_impl<eval_type>(e.rhs(), storage_right);
     using Op = typename E::Op;
     if constexpr (std::is_same_v<std::minus<>, Op>) {
@@ -134,8 +135,15 @@ exactfp_eval_impl(E_ &&e, std::span<eval_type> partial_results) noexcept {
         v = -v;
       }
     } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
-      const auto storage_mult = partial_results.last(
-          partial_results.size() - reserve_left - reserve_right);
+      const auto storage_mult = [partial_results]() {
+        if constexpr (span_t::extent == std::dynamic_extent) {
+          return partial_results.last(partial_results.size() - reserve_left -
+                                      reserve_right);
+        } else {
+          return partial_results.template last<partial_results.size() -
+                                               reserve_left - reserve_right>();
+        }
+      }();
       sparse_mult(storage_left, storage_right, storage_mult);
     }
   } else if constexpr (!std::is_same_v<additive_id, E>) {
@@ -248,10 +256,10 @@ eval_type merge_sum5(std::span<eval_type> storage) {
   }
 }
 
-template <std::floating_point eval_type>
-void sparse_mult(std::span<eval_type> storage_left,
-                 std::span<eval_type> storage_right,
-                 std::span<eval_type> storage_mult) {
+template <std::ranges::range span_l, std::ranges::range span_r,
+          std::ranges::range span_m>
+void sparse_mult(span_l storage_left, span_r storage_right,
+                 span_m storage_mult) {
   // This performs multiplication in-place for a contiguous piece of memory
   // starting at storage_left.begin() and ending at storage_mult.end()
   //

@@ -47,7 +47,7 @@ constexpr eval_type exactfp_eval(E &&e) noexcept {
     }();
     _impl::exactfp_eval_impl<eval_type>(
         std::forward<E>(e),
-        std::span{partial_results.begin(), partial_results.end()});
+        std::span<eval_type, num_partials_for_exact<E>()>{partial_results});
     return _impl::merge_sum(std::span<eval_type>{partial_results});
     // return std::accumulate(partial_results.begin(), partial_results.end(),
     // eval_type(0));
