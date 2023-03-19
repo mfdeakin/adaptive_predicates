@@ -216,9 +216,11 @@ concept branch_token = std::is_base_of_v<branch_token_s, S>;
 template <typename S>
 concept branch_token_inner_node = branch_token<S> && requires(S s) { s.get(); };
 
-template <branch_token S>
+template <branch_token S_>
 class branch_token_inner_node_s : public branch_token_s {
 public:
+  using S = S_;
+
   branch_token_inner_node_s() : s{} {}
   branch_token_inner_node_s(S _s) : s{_s} {}
   constexpr auto &get() { return s.get(); }
@@ -233,6 +235,9 @@ public:
   branch_token_left() : branch_token_inner_node_s<S>{} {}
   branch_token_left(S _s) : branch_token_inner_node_s<S>{_s} {}
 
+  static constexpr bool is_left() { return true; }
+  static constexpr bool is_right() { return false; }
+
   template <template <class> class branch_dir>
   using append_branch =
       branch_token_left<typename S::template append_branch<branch_dir>>;
@@ -243,6 +248,9 @@ class branch_token_right : public branch_token_inner_node_s<S> {
 public:
   branch_token_right() : branch_token_inner_node_s<S>{} {}
   branch_token_right(S _s) : branch_token_inner_node_s<S>{_s} {}
+
+  static constexpr bool is_left() { return false; }
+  static constexpr bool is_right() { return true; }
 
   template <template <class> class branch_dir>
   using append_branch =

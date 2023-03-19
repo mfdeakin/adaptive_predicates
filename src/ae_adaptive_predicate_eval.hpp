@@ -22,7 +22,6 @@ public:
     if constexpr (!use_array) {
       exact_storage.reserve(num_partials_for_exact<E>());
     }
-    init_cache<branch_token_leaf, E>(exact_storage);
   }
 
   explicit adaptive_eval(const E_ &) : adaptive_eval() {}
@@ -34,33 +33,42 @@ public:
   }
 
 private:
-  template <branch_token branch, typename sub_expr>
-    requires expr_type<sub_expr> || arith_number<sub_expr>
-  void init_cache(std::span<eval_type> memory) {
-    if constexpr (is_expr_v<sub_expr>) {
-      branch_token_leaf &block = std::get<branch>(cache).get();
-      block.memory = memory;
-      using LHS = typename sub_expr::LHS;
-      using RHS = typename sub_expr::RHS;
-      init_cache<typename branch::template append_branch<branch_token_left>,
-                 LHS>(memory.first(num_partials_for_exact<LHS>()));
-      init_cache<typename branch::template append_branch<branch_token_right>,
-                 RHS>(
-          memory.subspan(num_partials_for_exact<LHS>(),
-                         num_partials_for_exact<typename sub_expr::RHS>()));
-    }
-  }
-
   class branch_token_leaf : public branch_token_s {
   public:
     template <template <class> class branch_dir>
     using append_branch = branch_dir<branch_token_leaf>;
 
     branch_token_leaf &get() { return *this; }
-    std::span<eval_type> memory;
     eval_type result = std::numeric_limits<eval_type>::signaling_NaN();
     bool computed = false;
   };
+
+  template <branch_token branch> constexpr auto get_memory() {
+    // since exact_storage might be a vector, ensure the compiler knows how
+    // large the vector is
+    return get_memory_impl<branch, E>(
+        std::span<eval_type, num_partials_for_exact<E>()>{exact_storage});
+  }
+
+  template <branch_token branch, typename sub_expr, std::ranges::range span_t>
+    requires expr_type<sub_expr> || arith_number<sub_expr>
+  constexpr auto get_memory_impl(span_t span) {
+    if constexpr (std::is_same_v<branch_token_leaf, branch>) {
+      return span;
+    } else if constexpr (branch::is_left()) {
+      return get_memory_impl<typename branch::S, typename sub_expr::LHS>(
+          std::span<eval_type,
+                    num_partials_for_exact<typename sub_expr::LHS>()>{
+              span.first(num_partials_for_exact<typename sub_expr::LHS>())});
+    } else {
+      static_assert(branch::is_right());
+      return get_memory_impl<typename branch::S, typename sub_expr::RHS>(
+          std::span<eval_type,
+                    num_partials_for_exact<typename sub_expr::RHS>()>{
+              span.subspan(num_partials_for_exact<typename sub_expr::LHS>(),
+                           num_partials_for_exact<typename sub_expr::RHS>())});
+    }
+  }
 
   template <typename sub_expr_, branch_token branch = branch_token_leaf>
     requires expr_type<sub_expr_> || arith_number<sub_expr_>
@@ -89,10 +97,10 @@ private:
           std::abs(result) *
               eval_type(1.0 -
                         std::numeric_limits<eval_type>::epsilon() * 8.0)) {
-        exact_eval<branch>(std::forward<sub_expr_>(expr),
-                           exact_eval_info.memory);
-        const eval_type exact_result = std::reduce(
-            exact_eval_info.memory.begin(), exact_eval_info.memory.end());
+        auto memory = get_memory<branch>();
+        exact_eval<branch>(std::forward<sub_expr_>(expr), memory);
+        const eval_type exact_result =
+            std::reduce(memory.begin(), memory.end());
         exact_eval_info.computed = true;
         exact_eval_info.result = exact_result;
         return {exact_result, std::abs(exact_result) *
