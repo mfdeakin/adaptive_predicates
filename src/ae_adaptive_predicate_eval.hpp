@@ -3,6 +3,7 @@
 #define ADAPTIVE_PREDICATES_AE_ADAPTIVE_PREDICATE_EVAL_HPP
 
 #include "ae_expr.hpp"
+#include "ae_expr_io.hpp"
 #include "ae_expr_utils.hpp"
 #include "ae_fp_eval.hpp"
 
@@ -41,9 +42,10 @@ private:
       block.memory = memory;
       using LHS = typename sub_expr::LHS;
       using RHS = typename sub_expr::RHS;
-      init_cache<typename branch::append_branch<branch_token_left>, LHS>(
-          memory.first(num_partials_for_exact<LHS>()));
-      init_cache<typename branch::append_branch<branch_token_right>, RHS>(
+      init_cache<typename branch::template append_branch<branch_token_left>,
+                 LHS>(memory.first(num_partials_for_exact<LHS>()));
+      init_cache<typename branch::template append_branch<branch_token_right>,
+                 RHS>(
           memory.subspan(num_partials_for_exact<LHS>(),
                          num_partials_for_exact<typename sub_expr::RHS>()));
     }
@@ -75,12 +77,12 @@ private:
       using Op = typename sub_expr::Op;
       auto [left_result, left_abs_err] =
           eval_impl<decltype(expr.lhs()),
-                    typename branch::append_branch<branch_token_left>>(
+                    typename branch::template append_branch<branch_token_left>>(
               expr.lhs());
-      auto [right_result, right_abs_err] =
-          eval_impl<decltype(expr.rhs()),
-                    typename branch::append_branch<branch_token_right>>(
-              expr.rhs());
+      auto [right_result, right_abs_err] = eval_impl<
+          decltype(expr.rhs()),
+          typename branch::template append_branch<branch_token_right>>(
+          expr.rhs());
       const auto [result, max_abs_err] = _impl::eval_with_max_abs_err<Op>(
           left_result, left_abs_err, right_result, right_abs_err);
       if (max_abs_err >
@@ -88,7 +90,7 @@ private:
               eval_type(1.0 -
                         std::numeric_limits<eval_type>::epsilon() * 8.0)) {
         exact_eval<branch>(std::forward<sub_expr_>(expr),
-                                      exact_eval_info.memory);
+                           exact_eval_info.memory);
         const eval_type exact_result = std::reduce(
             exact_eval_info.memory.begin(), exact_eval_info.memory.end());
         exact_eval_info.computed = true;
@@ -106,7 +108,8 @@ private:
 
   template <branch_token branch, typename sub_expr_>
     requires expr_type<sub_expr_> || arith_number<sub_expr_>
-  constexpr void exact_eval(sub_expr_ &&e, std::span<eval_type> partial_results) noexcept {
+  constexpr void exact_eval(sub_expr_ &&e,
+                            std::span<eval_type> partial_results) noexcept {
     using sub_expr = std::remove_cvref_t<sub_expr_>;
     if constexpr (is_expr_v<sub_expr>) {
       branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
@@ -116,13 +119,13 @@ private:
       const std::size_t reserve_left =
           num_partials_for_exact<typename sub_expr::LHS>();
       const auto storage_left = partial_results.first(reserve_left);
-      exact_eval<typename branch::append_branch<branch_token_left>>(
+      exact_eval<typename branch::template append_branch<branch_token_left>>(
           e.lhs(), storage_left);
       const std::size_t reserve_right =
           num_partials_for_exact<typename sub_expr::RHS>();
       const auto storage_right =
           partial_results.subspan(reserve_left, reserve_right);
-      exact_eval<typename branch::append_branch<branch_token_right>>(
+      exact_eval<typename branch::template append_branch<branch_token_right>>(
           e.rhs(), storage_right);
       using Op = typename sub_expr::Op;
       if constexpr (std::is_same_v<std::minus<>, Op>) {

@@ -106,7 +106,8 @@ template <typename E> constexpr auto trim_expr(E &&e) {
 template <typename E> constexpr auto rewrite_minus(E &&e) {
   if constexpr (is_expr_v<E>) {
     if constexpr (std::is_same_v<std::minus<>,
-                                 typename std::remove_cvref_t<E>::Op>) {
+                                 typename std::remove_cvref_t<E>::Op> &&
+                  !std::is_same_v<additive_id, typename E::LHS>) {
       auto new_left = rewrite_minus(e.lhs());
       auto new_right = rewrite_minus(e.rhs());
       return new_left + (additive_id{} - new_right);
@@ -234,7 +235,7 @@ public:
 
   template <template <class> class branch_dir>
   using append_branch =
-      branch_token_left<typename S::append_branch<branch_dir>>;
+      branch_token_left<typename S::template append_branch<branch_dir>>;
 };
 
 template <branch_token S>
@@ -245,7 +246,7 @@ public:
 
   template <template <class> class branch_dir>
   using append_branch =
-      branch_token_right<typename S::append_branch<branch_dir>>;
+      branch_token_right<typename S::template append_branch<branch_dir>>;
 };
 
 template <typename storage_t> struct apply_strings {

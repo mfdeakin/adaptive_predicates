@@ -59,6 +59,15 @@ concept negate_expr_type =
     is_expr_v<E> && std::is_same_v<typename E::Op, std::minus<>> &&
     std::is_same_v<typename E::LHS, additive_id>;
 
+template <typename LHS, typename RHS>
+using plus_expr = arith_expr<std::plus<>, LHS, RHS>;
+
+template <typename LHS, typename RHS>
+using minus_expr = arith_expr<std::minus<>, LHS, RHS>;
+
+template <typename LHS, typename RHS>
+using times_expr = arith_expr<std::multiplies<>, LHS, RHS>;
+
 template <typename T>
 concept arith_number = std::signed_integral<std::remove_cvref_t<T>> ||
                        std::floating_point<std::remove_cvref_t<T>>;
