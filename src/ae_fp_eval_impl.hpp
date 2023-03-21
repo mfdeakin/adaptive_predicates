@@ -18,20 +18,15 @@ namespace adaptive_expr {
 
 namespace _impl {
 
-template <std::floating_point eval_type>
-eval_type merge_sum1(std::span<eval_type> storage);
-template <std::floating_point eval_type>
-eval_type merge_sum2(std::span<eval_type> storage);
-template <std::floating_point eval_type>
-eval_type merge_sum3(std::span<eval_type> storage);
-template <std::floating_point eval_type>
-eval_type merge_sum4(std::span<eval_type> storage);
-template <std::floating_point eval_type>
-eval_type merge_sum5(std::span<eval_type> storage);
+template <std::ranges::range span_t> auto merge_sum1(span_t storage);
+template <std::ranges::range span_t> auto merge_sum2(span_t storage);
+template <std::ranges::range span_t> auto merge_sum3(span_t storage);
+template <std::ranges::range span_t> auto merge_sum4(span_t storage);
+template <std::ranges::range span_t> auto merge_sum5(span_t storage);
 
-template <std::floating_point eval_type>
-eval_type merge_sum(std::span<eval_type> storage) {
-  return merge_sum5(storage);
+template <std::ranges::range span_t>
+span_t::element_type merge_sum(span_t storage) {
+  return merge_sum5(std::span<typename span_t::element_type>{storage});
 }
 
 template <std::ranges::range span_l, std::ranges::range span_r,
@@ -151,8 +146,7 @@ constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
   }
 }
 
-template <std::floating_point eval_type>
-eval_type merge_sum1(std::span<eval_type> storage) {
+template <std::ranges::range span_t> auto merge_sum1(span_t storage) {
   if (storage.size() > 1) {
     auto [Q, _] = dekker_sum(storage[0], storage[1]);
     for (auto g : storage | std::views::drop(2)) {
@@ -166,8 +160,7 @@ eval_type merge_sum1(std::span<eval_type> storage) {
   }
 }
 
-template <std::floating_point eval_type>
-eval_type merge_sum2(std::span<eval_type> storage) {
+template <std::ranges::range span_t> auto merge_sum2(span_t storage) {
   if (storage.size() > 1) {
     auto [Q, _] = dekker_sum(storage[0], storage[1]);
     for (auto g : storage | std::views::drop(2)) {
@@ -181,12 +174,12 @@ eval_type merge_sum2(std::span<eval_type> storage) {
   }
 }
 
-template <std::floating_point eval_type>
-eval_type merge_sum3(std::span<eval_type> storage) {
+template <std::ranges::range span_t> auto merge_sum3(span_t storage) {
   if (storage.size() > 1) {
-    std::ranges::sort(storage, [](eval_type l, eval_type r) {
-      return std::abs(l) < std::abs(r);
-    });
+    std::ranges::sort(storage,
+                      [](span_t::element_type l, span_t::element_type r) {
+                        return std::abs(l) < std::abs(r);
+                      });
     auto [Q, _] = dekker_sum_unchecked(storage[0], storage[1]);
     for (auto g : storage | std::views::drop(2)) {
       std::tie(Q, _) = dekker_sum_unchecked(g, Q);
@@ -199,12 +192,12 @@ eval_type merge_sum3(std::span<eval_type> storage) {
   }
 }
 
-template <std::floating_point eval_type>
-eval_type merge_sum4(std::span<eval_type> storage) {
+template <std::ranges::range span_t> auto merge_sum4(span_t storage) {
   if (storage.size() > 1) {
-    std::ranges::sort(storage, [](eval_type l, eval_type r) {
-      return std::abs(l) > std::abs(r);
-    });
+    std::ranges::sort(storage,
+                      [](span_t::element_type l, span_t::element_type r) {
+                        return std::abs(l) > std::abs(r);
+                      });
     auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
     for (auto g : storage | std::views::drop(2)) {
       auto [R, _] = dekker_sum_unchecked(g, q);
@@ -218,12 +211,12 @@ eval_type merge_sum4(std::span<eval_type> storage) {
   }
 }
 
-template <std::floating_point eval_type>
-auto merge_sum5_append(std::span<eval_type> storage, eval_type v) {
-  auto out = storage.begin();
-  for (auto &e : storage) {
+auto merge_sum5_append(auto begin, auto end, auto v) {
+  using eval_type = decltype(v);
+  auto out = begin;
+  for (auto &e : std::span{begin, end}) {
     const auto [result, error] = knuth_sum(v, e);
-    e = std::numeric_limits<eval_type>::signaling_NaN();
+    e = eval_type{0.0};
     v = result;
     if (error) {
       *out = error;
@@ -233,15 +226,15 @@ auto merge_sum5_append(std::span<eval_type> storage, eval_type v) {
   return std::pair{out, v};
 }
 
-template <std::floating_point eval_type>
-eval_type merge_sum5(std::span<eval_type> storage) {
+template <std::ranges::range span_t>
+auto merge_sum5(span_t storage) {
+  using eval_type = typename span_t::element_type;
   if (storage.size() > 1) {
     auto out = storage.begin();
     for (eval_type &inp : storage) {
       eval_type v = inp;
-      inp = std::numeric_limits<eval_type>::signaling_NaN();
-      auto [new_out, result] =
-          merge_sum5_append(std::span{storage.begin(), out}, v);
+      inp = eval_type{0.0};
+      auto [new_out, result] = merge_sum5_append(storage.begin(), out, v);
       out = new_out;
       if (result) {
         *out = result;
@@ -252,7 +245,7 @@ eval_type merge_sum5(std::span<eval_type> storage) {
   } else if (storage.size() == 1) {
     return storage[0];
   } else {
-    return 0.0;
+    return eval_type{0.0};
   }
 }
 
