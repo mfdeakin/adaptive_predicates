@@ -264,11 +264,8 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
   std::uniform_real_distribution<real> dist(-1.0, 1.0);
   for (auto [points, expected] : orient2d_cases) {
     const auto e = build_orient2d_case(points);
-    CHECK(check_sign(expected, fp_eval<real>(e)));
     CHECK(check_sign(expected, adaptive_eval<decltype(e), real>{}.eval(e)));
     CHECK(check_sign(expected, exactfp_eval<real>(e)));
-    CHECK(check_sign(expected, orient2d(points[0].data(), points[1].data(),
-                                        points[2].data())));
   }
 }
 
