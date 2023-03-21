@@ -2,6 +2,7 @@
 #ifndef ADAPTIVE_PREDICATES_AE_FP_EVAL_HPP
 #define ADAPTIVE_PREDICATES_AE_FP_EVAL_HPP
 
+#include <algorithm>
 #include <optional>
 #include <ranges>
 #include <span>

@@ -7,6 +7,7 @@
 #include "ae_expr_utils.hpp"
 #include "ae_fp_eval.hpp"
 
+#include <numeric>
 #include <compare>
 #include <limits>
 
