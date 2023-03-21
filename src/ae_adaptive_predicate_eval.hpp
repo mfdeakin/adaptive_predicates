@@ -39,8 +39,8 @@ private:
     using append_branch = branch_dir<branch_token_leaf>;
 
     branch_token_leaf &get() { return *this; }
-    eval_type result = std::numeric_limits<eval_type>::signaling_NaN();
-    bool computed = false;
+
+    std::optional<eval_type> result;
   };
 
   template <branch_token branch> constexpr auto get_memory() {
@@ -76,9 +76,9 @@ private:
 
     if constexpr (is_expr_v<sub_expr>) {
       branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
-      if (exact_eval_info.computed) {
-        return {exact_eval_info.result,
-                std::abs(exact_eval_info.result) *
+      if (exact_eval_info.result) {
+        return {*exact_eval_info.result,
+                std::abs(*exact_eval_info.result) *
                     std::numeric_limits<eval_type>::epsilon() / 2.0};
       }
       using Op = typename sub_expr::Op;
@@ -100,7 +100,6 @@ private:
         exact_eval<branch>(std::forward<sub_expr_>(expr), memory);
         const eval_type exact_result =
             std::reduce(memory.begin(), memory.end());
-        exact_eval_info.computed = true;
         exact_eval_info.result = exact_result;
         return {exact_result, std::abs(exact_result) *
                                   std::numeric_limits<eval_type>::epsilon() /
@@ -122,7 +121,7 @@ private:
     using sub_expr = std::remove_cvref_t<sub_expr_>;
     if constexpr (is_expr_v<sub_expr>) {
       branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
-      if (exact_eval_info.computed) {
+      if (exact_eval_info.result) {
         return;
       }
       constexpr std::size_t reserve_left =
@@ -137,10 +136,14 @@ private:
       exact_eval<typename branch::template append_branch<branch_token_right>>(
           e.rhs(), storage_right);
       using Op = typename sub_expr::Op;
-      if constexpr (std::is_same_v<std::minus<>, Op>) {
-        for (eval_type &v : storage_right) {
-          v = -v;
+      if constexpr (std::is_same_v<std::plus<>, Op> ||
+                    std::is_same_v<std::minus<>, Op>) {
+        if constexpr (std::is_same_v<std::minus<>, Op>) {
+          for (eval_type &v : storage_right) {
+            v = -v;
+          }
         }
+        _impl::merge_sum(partial_results);
       } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
         const auto storage_mult =
             partial_results.template last<partial_results.size() -
@@ -148,6 +151,7 @@ private:
         _impl::sparse_mult(storage_left, storage_right, storage_mult);
       }
     } else if constexpr (!std::is_same_v<additive_id, sub_expr>) {
+      // additive_id is zero, so we don't actually have memory allocated for it
       *partial_results.begin() = eval_type(e);
     }
   }
