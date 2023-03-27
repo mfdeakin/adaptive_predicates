@@ -2,6 +2,9 @@
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
+add_compile_options("-g")
+add_link_options("-g")
+
 option(SANITIZER_ADDRESS "Enable address sanitizer" OFF)
 option(SANITIZER_MEMORY "Enable memory sanitizer" OFF)
 option(SANITIZER_THREAD "Enable thread sanitizer" OFF)
