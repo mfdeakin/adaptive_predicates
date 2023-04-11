@@ -7,30 +7,44 @@
 #include "ae_expr_utils.hpp"
 #include "ae_fp_eval.hpp"
 
-#include <numeric>
 #include <compare>
 #include <limits>
+#include <numeric>
 
 namespace adaptive_expr {
 
+namespace _impl {
 template <typename E_, typename eval_type>
   requires expr_type<E_> || arith_number<E_>
-class adaptive_eval {
+class adaptive_eval_impl;
+} // namespace _impl
+
+template <arith_number eval_type, expr_type E>
+eval_type adaptive_eval(E &&expr) {
+  return _impl::adaptive_eval_impl<E, eval_type>().eval(expr);
+}
+
+namespace _impl {
+
+template <typename E_, typename eval_type>
+  requires expr_type<E_> || arith_number<E_>
+class adaptive_eval_impl {
 public:
   using E = std::remove_cvref_t<E_>;
 
-  adaptive_eval() : exact_storage{} {
+  adaptive_eval_impl() : exact_storage{} {
     if constexpr (!use_array) {
       exact_storage.reserve(num_partials_for_exact<E>());
     }
   }
 
-  explicit adaptive_eval(const E_ &) : adaptive_eval() {}
+  explicit adaptive_eval_impl(const E_ &) : adaptive_eval_impl() {}
 
   template <typename EE>
     requires std::is_same_v<std::remove_cvref_t<EE>, E>
   eval_type eval(EE &&e) {
-    return eval_impl<EE, branch_token_leaf>(std::forward<EE>(e)).first;
+    const auto v = eval_impl<EE, branch_token_leaf>(std::forward<EE>(e)).first;
+    return v;
   }
 
 private:
@@ -168,6 +182,8 @@ private:
                      std::vector<eval_type>>
       exact_storage;
 };
+
+} // namespace _impl
 
 } // namespace adaptive_expr
 

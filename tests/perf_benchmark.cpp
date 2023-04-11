@@ -5,8 +5,6 @@
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
 
-using real = float;
-
 #include "testing_data.hpp"
 
 int main() {

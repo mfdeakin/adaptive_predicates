@@ -4,6 +4,8 @@
 
 using namespace adaptive_expr;
 
+using real = float;
+
 template <arith_number eval_type>
 constexpr bool check_sign(eval_type correct, eval_type check) {
   if (correct == eval_type{0.0}) {
@@ -19,10 +21,9 @@ constexpr auto
 build_orient2d_case(const std::array<std::array<real, 2>, 3> &points) {
   constexpr std::size_t x = 0;
   constexpr std::size_t y = 1;
-  using mult_expr = arith_expr<std::multiplies<>, real, real>;
   const auto cross_expr = [](const std::array<real, 2> &lhs,
                              const std::array<real, 2> &rhs) constexpr {
-    return mult_expr{lhs[x], rhs[y]} - mult_expr{lhs[y], rhs[x]};
+    return mult_expr(lhs[x], rhs[y]) - mult_expr(lhs[y], rhs[x]);
   };
   return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
          cross_expr(points[0], points[1]);
@@ -31,6 +32,12 @@ build_orient2d_case(const std::array<std::array<real, 2>, 3> &points) {
 // An array of test cases; each case contains an array of points to check the
 // orientation of, and the exact value from the orientation test
 constexpr auto orient2d_cases = std::array{
+    std::pair{
+        std::array{
+            std::array<real, 2>{2.1, 4.7},
+            std::array<real, 2>{-1.76, 7.34},
+            std::array<real, 2>{-3.04, 9.07}},
+        real{-3.2986}},
     std::pair{
         std::array{
             std::array<real, 2>{-0.257641255855560303, 0.282396793365478516},

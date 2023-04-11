@@ -14,7 +14,8 @@
 
 #include "shewchuk.h"
 
-using real = float;
+#include <CGAL/Exact_predicates_exact_constructions_kernel.h>
+#include <CGAL/Point_2.h>
 
 #include "testing_data.hpp"
 
@@ -30,7 +31,7 @@ static_assert(is_expr_v<const arith_expr<std::plus<>, real, real> &&>);
 
 TEST_CASE("expr_template_structure", "[expr_template]") {
   auto e = ((arith_expr{} + 4 - 7) * 5 + 3.0 / 6.0) / 2;
-  using E = typeof(e);
+  using E = decltype(e);
   static_assert(std::is_same_v<additive_id, E::LHS::LHS::LHS::LHS::LHS::LHS>);
   static_assert(std::is_same_v<additive_id, E::LHS::LHS::LHS::LHS::LHS::RHS>);
   static_assert(std::is_same_v<int, E::LHS::LHS::LHS::LHS::RHS>);
@@ -251,20 +252,16 @@ static_assert(
                    branch_token_right<branch_token_tag>>>);
 
 TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
-  REQUIRE((adaptive_eval<decltype(arith_expr{}), real>{}).eval(arith_expr{}) ==
-          0.0);
-  REQUIRE((adaptive_eval<decltype(arith_expr{} + 7.0), real>{})
-              .eval(arith_expr{} + 7.0) == 7.0);
-  REQUIRE((adaptive_eval<decltype((arith_expr{} + 7.0) * 2.0), real>{})
-              .eval((arith_expr{} + 7.0) * 2.0) == 14.0);
-  REQUIRE((adaptive_eval<decltype((arith_expr{} + 7.0) * 2.0 - 14.0), real>{})
-              .eval((arith_expr{} + 7.0) * 2.0 - 14.0) == 0.0);
+  REQUIRE(adaptive_eval<real>(arith_expr{}) == 0.0);
+  REQUIRE(adaptive_eval<real>(arith_expr{} + 7.0) == 7.0);
+  REQUIRE(adaptive_eval<real>((arith_expr{} + 7.0) * 2.0) == 14.0);
+  REQUIRE(adaptive_eval<real>((arith_expr{} + 7.0) * 2.0 - 14.0) == 0.0);
 
   std::mt19937_64 gen(std::random_device{}());
   std::uniform_real_distribution<real> dist(-1.0, 1.0);
   for (auto [points, expected] : orient2d_cases) {
     const auto e = build_orient2d_case(points);
-    CHECK(check_sign(expected, adaptive_eval<decltype(e), real>{}.eval(e)));
+    CHECK(check_sign(expected, adaptive_eval<real>(e)));
     CHECK(check_sign(expected, exactfp_eval<real>(e)));
   }
 }
@@ -321,6 +318,12 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   const auto points1 = orient2d_cases[0].first;
   constexpr std::size_t x = 0;
   constexpr std::size_t y = 1;
+  CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> pt0(
+      points1[0][x], points1[0][y]);
+  CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> pt1(
+      points1[1][x], points1[1][y]);
+  CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> pt2(
+      points1[2][x], points1[2][y]);
   BENCHMARK("build expr 1") { return build_orient2d_case(points1); };
   BENCHMARK("no expr floating point 1") {
     return points1[1][x] * points1[2][y] - points1[1][y] * points1[2][x] -
@@ -340,7 +343,7 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   };
   BENCHMARK("adaptive 1") {
     const auto e = build_orient2d_case(points1);
-    return adaptive_eval<decltype(e), real>{}.eval(e);
+    return adaptive_eval<real>(e);
   };
   BENCHMARK("shewchuk floating point 1") {
     return orient2dfast(points1[0].data(), points1[1].data(),
@@ -349,8 +352,17 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   BENCHMARK("shewchuk exact rounded 1") {
     return orient2d(points1[0].data(), points1[1].data(), points1[2].data());
   };
+  BENCHMARK("cgal exact rounded 1") {
+    return CGAL::orientation(pt0, pt1, pt2);
+  };
 
   const auto points2 = orient2d_cases[1].first;
+  pt0 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
+      points2[0][x], points2[0][y]);
+  pt1 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
+      points2[1][x], points2[1][y]);
+  pt2 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
+      points2[2][x], points2[2][y]);
   BENCHMARK("build expr 2") { return build_orient2d_case(points2); };
   BENCHMARK("no expr floating point 2") {
     return points2[1][x] * points2[2][y] - points2[1][y] * points2[2][x] -
@@ -370,7 +382,7 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   };
   BENCHMARK("adaptive 2") {
     const auto e = build_orient2d_case(points2);
-    return adaptive_eval<decltype(e), real>{}.eval(e);
+    return adaptive_eval<real>(e);
   };
   BENCHMARK("shewchuk floating point 2") {
     return orient2dfast(points2[0].data(), points2[1].data(),
@@ -379,8 +391,17 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   BENCHMARK("shewchuk exact rounded 2") {
     return orient2d(points2[0].data(), points2[1].data(), points2[2].data());
   };
+  BENCHMARK("cgal exact rounded 2") {
+    return CGAL::orientation(pt0, pt1, pt2);
+  };
 
   const auto points3 = orient2d_cases[15].first;
+  pt0 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
+      points3[0][x], points3[0][y]);
+  pt1 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
+      points3[1][x], points3[1][y]);
+  pt2 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
+      points3[2][x], points3[2][y]);
   BENCHMARK("build expr 3") { return build_orient2d_case(points3); };
   BENCHMARK("no expr floating point 3") {
     return points3[1][x] * points3[2][y] - points3[1][y] * points3[2][x] -
@@ -400,7 +421,7 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   };
   BENCHMARK("adaptive 3") {
     const auto e = build_orient2d_case(points3);
-    return adaptive_eval<decltype(e), real>{}.eval(e);
+    return adaptive_eval<real>(e);
   };
   BENCHMARK("shewchuk floating point 3") {
     return orient2dfast(points3[0].data(), points3[1].data(),
@@ -408,5 +429,8 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   };
   BENCHMARK("shewchuk exact rounded 3") {
     return orient2d(points3[0].data(), points3[1].data(), points3[2].data());
+  };
+  BENCHMARK("cgal exact rounded 3") {
+    return CGAL::orientation(pt0, pt1, pt2);
   };
 }

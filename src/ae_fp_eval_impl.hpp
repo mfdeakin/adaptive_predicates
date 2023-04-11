@@ -25,7 +25,7 @@ template <std::ranges::range span_t> auto merge_sum4(span_t storage);
 template <std::ranges::range span_t> auto merge_sum5(span_t storage);
 
 template <std::ranges::range span_t>
-span_t::element_type merge_sum(span_t storage) {
+typename span_t::element_type merge_sum(span_t storage) {
   return merge_sum5(std::span<typename span_t::element_type>{storage});
 }
 
@@ -177,7 +177,7 @@ template <std::ranges::range span_t> auto merge_sum2(span_t storage) {
 template <std::ranges::range span_t> auto merge_sum3(span_t storage) {
   if (storage.size() > 1) {
     std::ranges::sort(storage,
-                      [](span_t::element_type l, span_t::element_type r) {
+                      [](typename span_t::element_type l, typename span_t::element_type r) {
                         return std::abs(l) < std::abs(r);
                       });
     auto [Q, _] = dekker_sum_unchecked(storage[0], storage[1]);
@@ -195,7 +195,7 @@ template <std::ranges::range span_t> auto merge_sum3(span_t storage) {
 template <std::ranges::range span_t> auto merge_sum4(span_t storage) {
   if (storage.size() > 1) {
     std::ranges::sort(storage,
-                      [](span_t::element_type l, span_t::element_type r) {
+                      [](typename span_t::element_type l, typename span_t::element_type r) {
                         return std::abs(l) > std::abs(r);
                       });
     auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
@@ -215,7 +215,7 @@ auto merge_sum5_append(auto begin, auto end, auto v) {
   using eval_type = decltype(v);
   auto out = begin;
   for (auto &e : std::span{begin, end}) {
-    const auto [result, error] = knuth_sum(v, e);
+    const auto [result, error] = dekker_sum(v, e);
     e = eval_type{0.0};
     v = result;
     if (error) {
