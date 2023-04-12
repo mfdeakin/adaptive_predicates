@@ -19,4 +19,7 @@ add_executable(perf_benchmark perf_benchmark.cpp)
 target_compile_options(perf_benchmark PUBLIC -fno-omit-frame-pointer)
 target_link_libraries(perf_benchmark PRIVATE adaptive_predicates)
 
+add_executable(generate_cases generate_cases.cpp)
+target_link_libraries(generate_cases PRIVATE adaptive_predicates)
+
 catch_discover_tests(tests)
