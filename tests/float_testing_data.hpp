@@ -2,32 +2,7 @@
 #ifndef TESTING_DATA_HPP
 #define TESTING_DATA_HPP
 
-using namespace adaptive_expr;
-
 using real = float;
-
-template <arith_number eval_type>
-constexpr bool check_sign(eval_type correct, eval_type check) {
-  if (correct == eval_type{0.0}) {
-    return check == eval_type{0.0};
-  } else if (check == eval_type{0.0}) {
-    return false;
-  } else {
-    return std::signbit(correct) == std::signbit(check);
-  }
-}
-
-constexpr auto
-build_orient2d_case(const std::array<std::array<real, 2>, 3> &points) {
-  constexpr std::size_t x = 0;
-  constexpr std::size_t y = 1;
-  const auto cross_expr = [](const std::array<real, 2> &lhs,
-                             const std::array<real, 2> &rhs) constexpr {
-    return mult_expr(lhs[x], rhs[y]) - mult_expr(lhs[y], rhs[x]);
-  };
-  return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
-         cross_expr(points[0], points[1]);
-}
 
 // An array of test cases; each case contains an array of points to check the
 // orientation of, and the exact value from the orientation test

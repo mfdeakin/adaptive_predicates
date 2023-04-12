@@ -5,7 +5,10 @@
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
 
-#include "testing_data.hpp"
+#include "testing_utils.hpp"
+#include "float_testing_data.hpp"
+
+#include <random>
 
 int main() {
   double final_result = 0.0;

@@ -2,14 +2,9 @@
 #ifndef ADAPTIVE_PREDICATES_AE_FP_EVAL_IMPL_HPP
 #define ADAPTIVE_PREDICATES_AE_FP_EVAL_IMPL_HPP
 
+#include <cmath>
 #include <ranges>
 #include <span>
-
-#define FP_FAST_FMA
-#define FP_FAST_FMAF
-#define FP_FAST_FMAL
-
-#include <cmath>
 
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
@@ -176,10 +171,10 @@ template <std::ranges::range span_t> auto merge_sum2(span_t storage) {
 
 template <std::ranges::range span_t> auto merge_sum3(span_t storage) {
   if (storage.size() > 1) {
-    std::ranges::sort(storage,
-                      [](typename span_t::element_type l, typename span_t::element_type r) {
-                        return std::abs(l) < std::abs(r);
-                      });
+    std::ranges::sort(storage, [](typename span_t::element_type l,
+                                  typename span_t::element_type r) {
+      return std::abs(l) < std::abs(r);
+    });
     auto [Q, _] = dekker_sum_unchecked(storage[0], storage[1]);
     for (auto g : storage | std::views::drop(2)) {
       std::tie(Q, _) = dekker_sum_unchecked(g, Q);
@@ -194,10 +189,10 @@ template <std::ranges::range span_t> auto merge_sum3(span_t storage) {
 
 template <std::ranges::range span_t> auto merge_sum4(span_t storage) {
   if (storage.size() > 1) {
-    std::ranges::sort(storage,
-                      [](typename span_t::element_type l, typename span_t::element_type r) {
-                        return std::abs(l) > std::abs(r);
-                      });
+    std::ranges::sort(storage, [](typename span_t::element_type l,
+                                  typename span_t::element_type r) {
+      return std::abs(l) > std::abs(r);
+    });
     auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
     for (auto g : storage | std::views::drop(2)) {
       auto [R, _] = dekker_sum_unchecked(g, q);
@@ -226,8 +221,7 @@ auto merge_sum5_append(auto begin, auto end, auto v) {
   return std::pair{out, v};
 }
 
-template <std::ranges::range span_t>
-auto merge_sum5(span_t storage) {
+template <std::ranges::range span_t> auto merge_sum5(span_t storage) {
   using eval_type = typename span_t::element_type;
   if (storage.size() > 1) {
     auto out = storage.begin();

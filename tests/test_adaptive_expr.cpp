@@ -17,7 +17,8 @@
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Point_2.h>
 
-#include "testing_data.hpp"
+#include "testing_utils.hpp"
+#include "float_testing_data.hpp"
 
 using namespace adaptive_expr;
 using namespace _impl;

@@ -7,11 +7,8 @@
 #include <ranges>
 #include <span>
 
-#define FP_FAST_FMA
-#define FP_FAST_FMAF
-#define FP_FAST_FMAL
-
 #include <cmath>
+#include <cassert>
 
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
