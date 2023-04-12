@@ -5,14 +5,14 @@
 extern "C" {
 
   void exactinit();
-  float orient2d(const float *pa, const float *pb, const float *pc);
-  float orient2dfast(const float *pa, const float *pb, const float *pc);
-  float orient3d(const float *pa, const float *pb, const float *pc);
-  float orient3dfast(const float *pa, const float *pb, const float *pc);
-  float incircle(const float *pa, const float *pb, const float *pc, const float *pd);
-  float incirclefast(const float *pa, const float *pb, const float *pc, const float *pd);
-  float insphere(const float *pa, const float *pb, const float *pc, const float *pd, const float *pe);
-  float inspherefast(const float *pa, const float *pb, const float *pc, const float *pd, const float *pe);
+  double orient2d(const double *pa, const double *pb, const double *pc);
+  double orient2dfast(const double *pa, const double *pb, const double *pc);
+  double orient3d(const double *pa, const double *pb, const double *pc);
+  double orient3dfast(const double *pa, const double *pb, const double *pc);
+  double incircle(const double *pa, const double *pb, const double *pc, const double *pd);
+  double incirclefast(const double *pa, const double *pb, const double *pc, const double *pd);
+  double insphere(const double *pa, const double *pb, const double *pc, const double *pd, const double *pe);
+  double inspherefast(const double *pa, const double *pb, const double *pc, const double *pd, const double *pe);
 
 }
 

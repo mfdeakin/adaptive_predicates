@@ -18,7 +18,7 @@
 #include <CGAL/Point_2.h>
 
 #include "testing_utils.hpp"
-#include "float_testing_data.hpp"
+#include "double_testing_data.hpp"
 
 using namespace adaptive_expr;
 using namespace _impl;

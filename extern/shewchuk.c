@@ -130,7 +130,7 @@
 #define INEXACT                          /* Nothing */
 /* #define INEXACT volatile */
 
-#define REAL float                      /* float or double */
+#define REAL double                      /* float or double */
 #define REALPRINT floatprint
 #define REALRAND floatrand
 #define NARROWRAND narrowfloatrand
