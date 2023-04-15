@@ -7,10 +7,12 @@
 #if __cpp_lib_mdspan >= 202207L
 #include <mdspan>
 using std::extents;
+using std::mdarray;
 using std::mdspan;
 #else
 #include <mdspan.hpp>
 using std::experimental::extents;
+using std::experimental::mdarray;
 using std::experimental::mdspan;
 #endif
 
@@ -55,15 +57,15 @@ determinant(const mdspan<row_exprs, extents<std::size_t, N, N>> mtx,
     } else {
       using submtx_expr =
           decltype(mult_expr(v, mtx[0, 0]) - mult_expr(v, mtx[0, 0]));
-      std::array<submtx_expr, (N - 1) * (N - 1)> submtx;
+      mdarray<submtx_expr, extents<std::size_t, N - 1, N - 1>> submtx;
       for (std::size_t i = 1; i < N; ++i) {
         const auto s = balance_expr(mtx[i, 0]);
         for (std::size_t j = 1; j < N; ++j) {
-          submtx[(i - 1) * (N - 1) + j - 1] =
+          submtx[i - 1, j - 1] =
               mult_expr(v, mtx[i, j]) - mult_expr(s, mtx[0, j]);
         }
       }
-      mdspan<submtx_expr, extents<std::size_t, N - 1, N - 1>> submtx_span{
+      const mdspan<submtx_expr, extents<std::size_t, N - 1, N - 1>> submtx_span{
           submtx.data()};
       const auto subdet = determinant<eval_type>(submtx_span);
       return subdet * std::pow(approx_val, -N + 2) * std::pow(-1, swaps);
