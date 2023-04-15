@@ -20,7 +20,7 @@ target_compile_options(perf_benchmark PUBLIC -fno-omit-frame-pointer)
 target_link_libraries(perf_benchmark PRIVATE adaptive_predicates)
 
 add_executable(test_matrix test_matrix.cpp)
-target_link_libraries(test_matrix PRIVATE adaptive_predicates)
+target_link_libraries(test_matrix PRIVATE adaptive_predicates Catch2::Catch2WithMain)
 target_include_directories(test_matrix PRIVATE ${CMAKE_SOURCE_DIR}/extern)
 
 add_executable(generate_cases generate_cases.cpp)
