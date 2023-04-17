@@ -34,14 +34,6 @@ int main() {
   for (;;) {
     const auto points = gen_points();
     const auto expr = build_orient2d_case(points);
-    const auto print_dbl = [](const double v) {
-      const int exp = std::ilogb(v);
-      const double normalized =
-          std::pow(2, std::numeric_limits<double>::digits - exp - 1) * v;
-      const long int mantissa = std::lrint(normalized);
-      fmt::print("{: 10},   {: 64b} ({: .17f}, {: 17.1f})\n", exp, mantissa,
-                 std::pow(2, -exp - 1) * v, normalized);
-    };
     if (!correct_eval<double>(expr)) {
       if (!check_sign(adaptive_eval<double>(expr), fp_eval<double>(expr))) {
         fmt::print("std::pair{{\n"
