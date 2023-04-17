@@ -68,37 +68,31 @@ concept arith_expr_operands =
     (expr_type<LHS> && (expr_type<RHS> || arith_number<RHS>)) ||
     (expr_type<RHS> && arith_number<LHS>);
 
-template <typename LHS, typename RHS>
-  requires arith_expr_operands<LHS, RHS> ||
-           (arith_number<LHS> && arith_number<RHS>)
-auto plus_expr(LHS lhs, RHS rhs) {
-  return arith_expr<std::plus<>, std::remove_cvref_t<LHS>,
-                    std::remove_cvref_t<RHS> >{lhs, rhs};
+template <typename Op, typename LHS_, typename RHS_>
+  requires arith_expr_operands<LHS_, RHS_> ||
+           (arith_number<LHS_> && arith_number<RHS_>)
+auto make_expr(LHS_ &&lhs, RHS_ &&rhs) {
+  using LHS = std::remove_cvref_t<LHS_>;
+  using RHS = std::remove_cvref_t<RHS_>;
+  return arith_expr<Op, LHS, RHS>(lhs, rhs);
+}
+
+template <typename LHS, typename RHS> auto plus_expr(LHS lhs, RHS rhs) {
+  return make_expr<std::plus<>>(lhs, rhs);
+}
+
+template <typename LHS, typename RHS> auto minus_expr(LHS lhs, RHS rhs) {
+  return make_expr<std::minus<>>(lhs, rhs);
+}
+
+template <typename LHS, typename RHS> auto mult_expr(LHS lhs, RHS rhs) {
+  return make_expr<std::multiplies<>>(lhs, rhs);
 }
 
 template <typename LHS, typename RHS>
-  requires arith_expr_operands<LHS, RHS> ||
-           (arith_number<LHS> && arith_number<RHS>)
-auto minus_expr(LHS lhs, RHS rhs) {
-  return arith_expr<std::minus<>, std::remove_cvref_t<LHS>,
-                    std::remove_cvref_t<RHS> >{lhs, rhs};
-}
-
-template <typename LHS, typename RHS>
-  requires arith_expr_operands<LHS, RHS> ||
-           (arith_number<LHS> && arith_number<RHS>)
-auto mult_expr(LHS lhs, RHS rhs) {
-  return arith_expr<std::multiplies<>, std::remove_cvref_t<LHS>,
-                    std::remove_cvref_t<RHS> >{lhs, rhs};
-}
-
-template <typename LHS, typename RHS>
-  requires(!std::is_same_v<RHS, additive_id> &&
-           (arith_expr_operands<LHS, RHS> ||
-            (arith_number<LHS> && arith_number<RHS>)))
+  requires(!std::is_same_v<RHS, additive_id>)
 auto divide_expr(LHS lhs, RHS rhs) {
-  return arith_expr<std::divides<>, std::remove_cvref_t<LHS>,
-                    std::remove_cvref_t<RHS> >{lhs, rhs};
+  return make_expr<std::divides<>>(lhs, rhs);
 }
 
 template <expr_type E> constexpr auto operator-(const E &expr) {

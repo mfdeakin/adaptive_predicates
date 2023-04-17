@@ -62,11 +62,11 @@ template <typename E> constexpr auto trim_expr(E &&e) {
         return new_left;
       } else {
         if constexpr (negate_expr_type<right_t>) {
-          return new_left - new_right;
+          return minus_expr(new_left, new_right.rhs());
         } else if constexpr (negate_expr_type<left_t>) {
-          return new_right - new_left;
+          return minus_expr(new_right, new_left.rhs());
         } else {
-          return new_left + new_right;
+          return plus_expr(new_left, new_right);
         }
       }
     } else if constexpr (std::is_same_v<std::minus<>, Op>) {
@@ -77,15 +77,15 @@ template <typename E> constexpr auto trim_expr(E &&e) {
         return new_left;
       } else {
         if constexpr (negate_expr_type<left_t> && negate_expr_type<right_t>) {
-          return new_right.rhs() - new_left.rhs();
+          return minus_expr(new_right.rhs(), new_left.rhs());
         } else if constexpr (negate_expr_type<right_t>) {
           if constexpr (std::is_same_v<additive_id, left_t>) {
             return new_right.rhs();
           } else {
-            return new_left + new_right.rhs();
+            return plus_expr(new_left, new_right.rhs());
           }
         } else {
-          return new_left - new_right;
+          return minus_expr(new_left, new_right);
         }
       }
     } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
@@ -93,17 +93,18 @@ template <typename E> constexpr auto trim_expr(E &&e) {
                     std::is_same_v<additive_id, right_t>) {
         return additive_id{};
       } else {
-        return new_left * new_right;
+        return mult_expr(new_left, new_right);
       }
     } else {
-      return Op()(new_left, new_right);
+      return make_expr<Op>(new_left, new_right);
     }
   } else {
     return e;
   }
 }
 
-template <typename E> constexpr auto rewrite_minus(E &&e) {
+template <typename E_> constexpr auto rewrite_minus(E_ &&e) {
+  using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr_v<E>) {
     if constexpr (std::is_same_v<std::minus<>,
                                  typename std::remove_cvref_t<E>::Op> &&
@@ -112,7 +113,8 @@ template <typename E> constexpr auto rewrite_minus(E &&e) {
       auto new_right = rewrite_minus(e.rhs());
       return new_left + (additive_id{} - new_right);
     } else {
-      return e;
+      return make_expr<typename E::Op>(rewrite_minus(e.lhs()),
+                                       rewrite_minus(e.rhs()));
     }
   } else {
     return e;
@@ -156,20 +158,64 @@ template <typename E_> constexpr auto _balance_expr_impl(E_ &&e) {
     if constexpr (depth(balanced_left) > depth(balanced_right) + 1 &&
                   associative_commutative<E, LHS>) {
       if constexpr (depth(balanced_left.lhs()) > depth(balanced_left.rhs())) {
-        return Op{}(Op{}(balanced_right, balanced_left.rhs()),
-                    balanced_left.lhs());
+        /*       +''          +''
+         *      / \         /   \
+         *     +'  d  =>   +'    +
+         *    / \         / \   / \
+         *   +   c       d   c a   b
+         *  / \
+         * a   b
+         *
+         * (((a + b) +' d) +'' c) => ((d +' c) +'' (a + b))
+         */
+        return make_expr<Op>(
+            make_expr<typename LHS::Op>(balanced_right, balanced_left.rhs()),
+            balanced_left.lhs());
       } else {
-        return Op{}(Op{}(balanced_left.lhs(), balanced_right),
-                    balanced_left.rhs());
+        /*       +''          +'
+         *      / \         /   \
+         *     +'  d  =>   +''   +
+         *    / \         / \   / \
+         *   a   +       a   d b   c
+         *      / \
+         *     b   c
+         *
+         * ((a + (b +' d)) +'' c) => ((a +'' d) +' (b + c))
+         */
+        return make_expr<typename LHS::Op>(
+            make_expr<Op>(balanced_left.lhs(), balanced_right),
+            balanced_left.rhs());
       }
     } else if constexpr (depth(balanced_right) > depth(balanced_left) + 1 &&
                          associative_commutative<E, RHS>) {
       if constexpr (depth(balanced_right.lhs()) > depth(balanced_right.rhs())) {
-        return Op{}(balanced_right.lhs(),
-                    Op{}(balanced_left, balanced_right.rhs()));
+        /*       +             +
+         *      / \          /   \
+         *     a   +'  =>   +''   +'
+         *        / \      / \   / \
+         *       +'' d    b   c a   d
+         *      / \
+         *     b   c
+         *
+         * (a + ((b +'' c) +' d)) => ((b +'' c) + (a +' d))
+         */
+        return make_expr<Op>(
+            balanced_right.lhs(),
+            make_expr<typename RHS::Op>(balanced_left, balanced_right.rhs()));
       } else {
-        return Op{}(balanced_right.rhs(),
-                    Op{}(balanced_right.lhs(), balanced_left));
+        /*       +             +
+         *      / \          /   \
+         *     a   +'  =>   +''   +'
+         *        / \      / \   / \
+         *       b   +''  c   d b   a
+         *          / \
+         *         c   d
+         *
+         * (a + (b +' (c +'' d)) => ((c +'' d) + (b +' a))
+         */
+        return make_expr<Op>(
+            balanced_right.rhs(),
+            make_expr<typename RHS::Op>(balanced_right.lhs(), balanced_left));
       }
     } else {
       return e;

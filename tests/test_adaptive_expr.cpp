@@ -17,8 +17,8 @@
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Point_2.h>
 
-#include "testing_utils.hpp"
 #include "double_testing_data.hpp"
+#include "testing_utils.hpp"
 
 using namespace adaptive_expr;
 using namespace _impl;
@@ -194,6 +194,22 @@ static_assert(std::is_same_v<
                                               additive_id{})>),
                   decltype(additive_id{} - additive_id{} - additive_id{})>,
               additive_id>);
+
+static_assert(
+    std::is_same_v<
+        decltype(rewrite_minus(mult_expr(3.0, 5.1) - mult_expr(0.0, 1.0))),
+        decltype(mult_expr(3.0, 5.1) + (additive_id{} - mult_expr(0.0, 1.0)))>);
+static_assert(
+    std::is_same_v<decltype(_balance_expr_impl(mult_expr(3.0, 5.1) -
+                                               mult_expr(0.0, 1.0))),
+                   decltype(mult_expr(3.0, 5.1) - mult_expr(0.0, 1.0))>);
+static_assert(std::is_same_v<
+              decltype(trim_expr(mult_expr(3.0, 5.1) - mult_expr(0.0, 1.0))),
+              decltype(mult_expr(3.0, 5.1) - mult_expr(0.0, 1.0))>);
+static_assert(std::is_same_v<
+              decltype(balance_expr(mult_expr(3.0, 5.1) -
+              mult_expr(0.0, 1.0))), decltype(mult_expr(3.0, 5.1) -
+              mult_expr(0.0, 1.0))>);
 
 TEST_CASE("expr_template_trim", "[expr_template_rewrite]") {
   REQUIRE(trim_expr(additive_id{} + 5) == 5);
