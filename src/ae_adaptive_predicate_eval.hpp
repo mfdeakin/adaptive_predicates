@@ -19,9 +19,14 @@ template <typename E_, typename eval_type>
 class adaptive_eval_impl;
 } // namespace _impl
 
-template <arith_number eval_type, expr_type E>
+template <arith_number eval_type, typename E>
+  requires expr_type<E> || arith_number<E>
 eval_type adaptive_eval(E &&expr) {
-  return _impl::adaptive_eval_impl<E, eval_type>().eval(expr);
+  if constexpr (arith_number<E>) {
+    return expr;
+  } else {
+    return _impl::adaptive_eval_impl<E, eval_type>().eval(expr);
+  }
 }
 
 namespace _impl {
