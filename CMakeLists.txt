@@ -14,6 +14,13 @@ add_library(adaptive_predicates INTERFACE
 target_include_directories(adaptive_predicates INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(adaptive_predicates INTERFACE fmt::fmt)
 
+target_sources(adaptive_predicates PUBLIC FILE_SET HEADERS
+  BASE_DIRS src
+  FILES src/ae_expr.hpp src/ae_expr_utils.hpp src/ae_fp_eval.hpp src/ae_fp_eval_impl.hpp
+  src/ae_expr_utils.hpp src/ae_expr_io.hpp src/ae_adaptive_predicate_eval.hpp)
+
+install(TARGETS adaptive_predicates FILE_SET HEADERS)
+
 add_subdirectory(extern)
 
 option(ADP_ENABLE_TESTS "Test suite" ON)
