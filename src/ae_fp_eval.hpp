@@ -7,8 +7,8 @@
 #include <ranges>
 #include <span>
 
-#include <cmath>
 #include <cassert>
+#include <cmath>
 
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
@@ -43,10 +43,10 @@ constexpr eval_type exactfp_eval(E &&e) noexcept {
         return arr;
       }
     }();
-    _impl::exactfp_eval_impl<eval_type>(
-        std::forward<E>(e),
-        std::span<eval_type, num_partials_for_exact<E>()>{partial_results});
-    return _impl::merge_sum(std::span<eval_type>{partial_results});
+    std::span<eval_type, num_partials_for_exact<E>()> partial_span{
+        partial_results};
+    _impl::exactfp_eval_impl<eval_type>(std::forward<E>(e), partial_span);
+    return _impl::merge_sum(partial_span);
     // return std::accumulate(partial_results.begin(), partial_results.end(),
     // eval_type(0));
   } else {

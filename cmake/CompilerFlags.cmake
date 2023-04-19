@@ -5,6 +5,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 add_compile_options("-g")
 add_link_options("-g")
 
+option(PROFILE_BUILD "Enable profiling of the compilation process" OFF)
+if(PROFILE_BUILD)
+  add_compile_options("-v" "-ftime-report")
+endif()
+
 option(SANITIZER_ADDRESS "Enable address sanitizer" OFF)
 option(SANITIZER_MEMORY "Enable memory sanitizer" OFF)
 option(SANITIZER_THREAD "Enable thread sanitizer" OFF)

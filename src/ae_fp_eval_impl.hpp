@@ -235,7 +235,11 @@ template <std::ranges::range span_t> auto merge_sum5(span_t storage) {
         ++out;
       }
     }
-    return *(out - 1);
+    if (out == storage.begin()) {
+      return eval_type{0};
+    } else {
+      return *(out - 1);
+    }
   } else if (storage.size() == 1) {
     return storage[0];
   } else {
