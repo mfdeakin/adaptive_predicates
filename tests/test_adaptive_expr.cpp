@@ -320,3 +320,42 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
 
   REQUIRE(!correct_eval<real>(build_orient2d_case(points)));
 }
+
+TEST_CASE("nonoverlapping", "[eval_utils]") {
+  CHECK(is_nonoverlapping(std::vector<real>{}));
+  CHECK(is_nonoverlapping(std::vector<real>{0}));
+  CHECK(is_nonoverlapping(std::vector<real>{0, 0, 0}));
+  CHECK(is_nonoverlapping(std::vector<real>{0.125}));
+  CHECK(is_nonoverlapping(std::vector<real>{0.125, 0.25}));
+  CHECK(is_nonoverlapping(std::vector<real>{0.125, -0.25, 1.5}));
+  CHECK(is_nonoverlapping(
+      std::vector<real>{0.0, 0.0, 0.0, 0.0, -0.375, 0.5, -1.0, 14.0}));
+  CHECK(is_nonoverlapping(std::vector<real>{-0.375, 0.5, -1.0, 14.0}));
+  CHECK(is_nonoverlapping(std::vector<real>{-0.375, 0.5, -1.0, 14.0}));
+  CHECK(is_nonoverlapping(std::vector<real>{-0.375, 0.5, -1.0, 14.0}));
+  CHECK(is_nonoverlapping(std::vector<real>{-0.375, 0.5, -1.0, 14.0}));
+  CHECK(is_nonoverlapping(std::vector<real>{-0.375, 0.5, -1.0, 14.0}));
+  CHECK(!is_nonoverlapping(std::vector<real>{0.125, 0.375}));
+  CHECK(!is_nonoverlapping(std::vector<real>{0.125, -0.25, 1.75}));
+  CHECK(!is_nonoverlapping(std::vector<real>{-0.375, 0.5, 0, -1.0, 15.0}));
+  CHECK(!is_nonoverlapping(std::vector<real>{-0.375, 0, -0.75, 0, 1.0, 14.0}));
+  CHECK(
+      !is_nonoverlapping(std::vector<real>{-0.375, 0.5, 1.5, 0, 0, 0, -14.0}));
+
+  std::vector<real> merge_test{0,
+                               -1.5436178396078065e-49,
+                               -2.184158631330676e-33,
+                               -1.1470824290427116e-16,
+                               0,
+                               1.0353799381025734e-34,
+                               -1.7308376953906192e-17,
+                               -1.2053999999999998};
+  const auto midpoint = merge_test.begin() + 4;
+  CHECK(*midpoint == real{0});
+  CHECK(is_nonoverlapping(std::span{merge_test.begin(), midpoint}));
+  CHECK(is_nonoverlapping(std::span{midpoint, merge_test.end()}));
+  REQUIRE(midpoint > merge_test.begin());
+  REQUIRE(midpoint < merge_test.end());
+  merge_sum_linear(merge_test, midpoint);
+  CHECK(is_nonoverlapping(merge_test));
+}

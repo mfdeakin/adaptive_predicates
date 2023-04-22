@@ -2,6 +2,7 @@
 #ifndef ADAPTIVE_PREDICATES_AE_FP_EVAL_IMPL_HPP
 #define ADAPTIVE_PREDICATES_AE_FP_EVAL_IMPL_HPP
 
+#include <algorithm>
 #include <cmath>
 #include <ranges>
 #include <span>
@@ -13,15 +14,19 @@ namespace adaptive_expr {
 
 namespace _impl {
 
-template <std::ranges::range span_t> auto merge_sum1(span_t storage);
-template <std::ranges::range span_t> auto merge_sum2(span_t storage);
-template <std::ranges::range span_t> auto merge_sum3(span_t storage);
-template <std::ranges::range span_t> auto merge_sum4(span_t storage);
-template <std::ranges::range span_t> auto merge_sum5(span_t storage);
+auto merge_sum_linear(
+    std::ranges::range auto &&storage,
+    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
+    typename std::remove_cvref_t<decltype(storage)>::value_type;
+auto merge_sum_linear_fast(std::ranges::range auto &&storage,
+                           const typename decltype(storage)::iterator midpoint)
+    -> typename decltype(storage)::value_type;
+auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
+    typename std::remove_cvref_t<decltype(storage)>::value_type;
 
-template <std::ranges::range span_t>
-typename span_t::element_type merge_sum(span_t storage) {
-  return merge_sum5(std::span<typename span_t::element_type>{storage});
+auto merge_sum(std::ranges::range auto storage) ->
+    typename decltype(storage)::value_type {
+  return merge_sum_quadratic(storage);
 }
 
 template <std::ranges::range span_l, std::ranges::range span_r,
@@ -141,10 +146,20 @@ constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
   }
 }
 
-template <std::ranges::range span_t> auto merge_sum1(span_t storage) {
+auto merge_sum_linear_fast(
+    std::ranges::range auto &&storage,
+    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
+    typename std::remove_cvref_t<decltype(storage)>::value_type {
+  using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
+    std::ranges::inplace_merge(storage, midpoint, [](eval_type l, eval_type r) {
+      return std::abs(l) > std::abs(r);
+    });
     auto [Q, _] = dekker_sum(storage[0], storage[1]);
-    for (auto g : storage | std::views::drop(2)) {
+    for (auto g : storage | std::views::drop(2) |
+                      std::views::filter([](const eval_type v) {
+                        return v != eval_type{0};
+                      })) {
       std::tie(Q, _) = dekker_sum(g, Q);
     }
     return Q;
@@ -155,46 +170,21 @@ template <std::ranges::range span_t> auto merge_sum1(span_t storage) {
   }
 }
 
-template <std::ranges::range span_t> auto merge_sum2(span_t storage) {
+auto merge_sum_linear(
+    std::ranges::range auto &&storage,
+    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
+    typename std::remove_cvref_t<decltype(storage)>::value_type {
+  using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
-    auto [Q, _] = dekker_sum(storage[0], storage[1]);
-    for (auto g : storage | std::views::drop(2)) {
-      std::tie(Q, _) = knuth_sum(g, Q);
-    }
-    return Q;
-  } else if (storage.size() == 1) {
-    return storage[0];
-  } else {
-    return 0.0;
-  }
-}
-
-template <std::ranges::range span_t> auto merge_sum3(span_t storage) {
-  if (storage.size() > 1) {
-    std::ranges::sort(storage, [](typename span_t::element_type l,
-                                  typename span_t::element_type r) {
-      return std::abs(l) < std::abs(r);
-    });
-    auto [Q, _] = dekker_sum_unchecked(storage[0], storage[1]);
-    for (auto g : storage | std::views::drop(2)) {
-      std::tie(Q, _) = dekker_sum_unchecked(g, Q);
-    }
-    return Q;
-  } else if (storage.size() == 1) {
-    return storage[0];
-  } else {
-    return 0.0;
-  }
-}
-
-template <std::ranges::range span_t> auto merge_sum4(span_t storage) {
-  if (storage.size() > 1) {
-    std::ranges::sort(storage, [](typename span_t::element_type l,
-                                  typename span_t::element_type r) {
-      return std::abs(l) > std::abs(r);
-    });
+    std::ranges::inplace_merge(
+        storage, midpoint, [](const eval_type &left, const eval_type &right) {
+          return std::abs(left) < std::abs(right);
+        });
     auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
-    for (auto g : storage | std::views::drop(2)) {
+    for (auto g : storage | std::views::drop(2) |
+                      std::views::filter([](const eval_type v) {
+                        return v != eval_type{0};
+                      })) {
       auto [R, _] = dekker_sum_unchecked(g, q);
       std::tie(Q, q) = knuth_sum(Q, R);
     }
@@ -206,7 +196,7 @@ template <std::ranges::range span_t> auto merge_sum4(span_t storage) {
   }
 }
 
-auto merge_sum5_append(auto begin, auto end, auto v) {
+auto merge_sum_append(auto begin, auto end, auto v) {
   using eval_type = decltype(v);
   auto out = begin;
   for (auto &e : std::span{begin, end}) {
@@ -221,14 +211,17 @@ auto merge_sum5_append(auto begin, auto end, auto v) {
   return std::pair{out, v};
 }
 
-template <std::ranges::range span_t> auto merge_sum5(span_t storage) {
-  using eval_type = typename span_t::element_type;
+auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
+    typename std::remove_cvref_t<decltype(storage)>::value_type {
+  using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
     auto out = storage.begin();
-    for (eval_type &inp : storage) {
+    for (eval_type &inp : storage | std::views::filter([](const eval_type v) {
+                            return v != eval_type{0};
+                          })) {
       eval_type v = inp;
       inp = eval_type{0.0};
-      auto [new_out, result] = merge_sum5_append(storage.begin(), out, v);
+      auto [new_out, result] = merge_sum_append(storage.begin(), out, v);
       out = new_out;
       if (result) {
         *out = result;
