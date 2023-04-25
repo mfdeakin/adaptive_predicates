@@ -163,7 +163,7 @@ private:
             v = -v;
           }
         }
-        _impl::merge_sum(partial_results);
+        _impl::merge_sum_linear(partial_results, partial_results.begin() + reserve_left);
       } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
         const auto storage_mult =
             partial_results.template last<partial_results.size() -

@@ -7,6 +7,8 @@
 #include <ranges>
 #include <span>
 
+#include <fmt/ranges.h>
+
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
 
@@ -129,6 +131,11 @@ constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
       for (eval_type &v : storage_right) {
         v = -v;
       }
+      merge_sum_linear(partial_results,
+                       partial_results.begin() + storage_left.size());
+    } else if constexpr (std::is_same_v<std::plus<>, Op>) {
+      merge_sum_linear(partial_results,
+                       partial_results.begin() + storage_left.size());
     } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
       const auto storage_mult = [partial_results]() {
         if constexpr (span_t::extent == std::dynamic_extent) {
@@ -240,30 +247,46 @@ auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
   }
 }
 
+// This performs multiplication in-place for a contiguous piece of memory
+// starting at storage_left.begin() and ending at storage_mult.end()
+//
+// storage_mult is initially empty and written to first
+// storage_right is overwritten second, each value in storage_left is finished
+// and over-writable when its iteration of the outer loop finishes
+// storage_left can be shown to only be is overwritten during the final
+// iteration of the outer loop, the values in it are only overwritten after
+// they've been multiplied If storage_left and storage_right are sorted by
+// increasing magnitude before multiplying, the first element in the output is
+// the least significant and the last element is the most significant
 template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_m>
 void sparse_mult(span_l storage_left, span_r storage_right,
                  span_m storage_mult) {
-  // This performs multiplication in-place for a contiguous piece of memory
-  // starting at storage_left.begin() and ending at storage_mult.end()
-  //
-  // storage_mult is initially empty and written to first
-  // storage_right is overwritten second, each value in storage_left is finished
-  // and over-writable when its iteration of the outer loop finishes
-  // storage_left can be shown to only be is overwritten during the final
-  // iteration of the outer loop, the values in it are only overwritten after
-  // they've been multiplied If storage_left and storage_right are sorted by
-  // increasing magnitude before multiplying, the first element in the output is
-  // the least significant and the last element is the most significant
+  if (storage_right.size() == 0 || storage_left.size() == 0) {
+    return;
+  }
+  using eval_type = typename span_l::value_type;
+  auto seq_begin = storage_mult.end();
   auto out_i = storage_mult.end() - 1;
-  for (auto l : storage_right | std::views::reverse) {
-    for (auto r : storage_left | std::views::reverse) {
+  for (auto r : storage_right | std::views::reverse) {
+    eval_type err;
+    std::tie(*out_i, err) =
+        exact_mult(r, (storage_left | std::views::reverse)[0]);
+    out_i--;
+    for (auto l : storage_left | std::views::reverse | std::views::drop(1)) {
       auto [upper, lower] = exact_mult(l, r);
-      *out_i = upper;
+      std::tie(*out_i, err) = dekker_sum(err, upper);
       --out_i;
-      *out_i = lower;
+      std::tie(*out_i, err) = dekker_sum_unchecked(err, lower);
       --out_i;
     }
+    *out_i = err;
+    out_i--;
+    if (seq_begin != storage_mult.end()) {
+      std::span one_mult{out_i + 1, storage_mult.end()};
+      merge_sum_linear(one_mult, one_mult.begin() + (seq_begin - out_i - 1));
+    }
+    seq_begin = out_i + 1;
   }
 }
 
