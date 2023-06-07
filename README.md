@@ -33,3 +33,5 @@ Multiplication computes the exact product of every pair in the two series being 
 For example, (30.0 + 2.0) * (10.0 + 0.5) = (30.0 * 10.0 + 30.0 * 0.5 + 2.0 * 10.0 + 2.0 * 0.5),
 which might expand to (300.0 + 10.0 + 5.0 + 20.0 + 1.0)
 Division can't currently be computed exactly; but todo in the future, it will be handled by rewriting the expression in terms of multiplications.
+
+This method is only performant for small expressions; for larger expressions, implementations using arbitrary precision floats like MPFR will be faster due to asymptotic complexity of multiplication

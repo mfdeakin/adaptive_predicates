@@ -118,6 +118,8 @@ private:
                         std::numeric_limits<eval_type>::epsilon() * 8.0)) {
         auto memory = get_memory<branch>();
         exact_eval<branch>(std::forward<sub_expr_>(expr), memory);
+        _impl::merge_sum(memory);
+
         const eval_type exact_result =
             std::reduce(memory.begin(), memory.end());
         exact_eval_info.result = exact_result;
@@ -163,7 +165,6 @@ private:
             v = -v;
           }
         }
-        _impl::merge_sum(partial_results);
       } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
         const auto storage_mult =
             partial_results.template last<partial_results.size() -
