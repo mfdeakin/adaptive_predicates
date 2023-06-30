@@ -61,6 +61,34 @@ build_orient2d_matrix(const std::array<std::array<eval_type, 2>, 3> &points) {
   return array;
 }
 
+template <adaptive_expr::arith_number eval_type>
+constexpr auto
+build_incircle2d_case(const std::array<std::array<eval_type, 2>, 4> &points) {
+  constexpr std::size_t x = 0;
+  constexpr std::size_t y = 1;
+  const auto dist_expr = [](const std::array<eval_type, 2> pt) constexpr {
+    return adaptive_expr::mult_expr(pt[x], pt[x]) +
+           adaptive_expr::mult_expr(pt[y], pt[y]);
+  };
+  const auto cross_expr = [](const std::array<eval_type, 2> &lhs,
+                             const std::array<eval_type, 2> &rhs) constexpr {
+    return adaptive_expr::mult_expr(lhs[x], rhs[y]) -
+           adaptive_expr::mult_expr(lhs[y], rhs[x]);
+  };
+  const auto incircle_subexpr =
+      [dist_expr, cross_expr](const std::array<eval_type, 2> &p0,
+                              const std::array<eval_type, 2> &p1,
+                              const std::array<eval_type, 2> &p2) constexpr {
+        return dist_expr(p0) * cross_expr(p1, p2) -
+               dist_expr(p1) * cross_expr(p0, p2) +
+               dist_expr(p2) * cross_expr(p0, p1);
+      };
+  return balance_expr(-incircle_subexpr(points[1], points[2], points[3]) +
+                      incircle_subexpr(points[0], points[2], points[3]) -
+                      incircle_subexpr(points[0], points[1], points[3]) +
+                      incircle_subexpr(points[0], points[1], points[2]));
+}
+
 template <typename eval_type, typename row_exprs, std::size_t N>
 auto exchange_pivot(const mdspan<row_exprs, extents<std::size_t, N, N>> mtx) {
   eval_type approx_val{0};

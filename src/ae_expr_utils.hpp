@@ -189,6 +189,16 @@ template <typename E> constexpr auto balance_expr(E &&e) {
   return trim_expr(_balance_expr_impl(rewrite_minus(trim_expr(e))));
 }
 
+// associative_commutative is false when the expression operators fail to
+// satisfy the following properties:
+//
+// a (E1::Op) b = b (E1::Op) a
+// a (E2::Op) b = b (E2::Op) a
+// (a (E1::Op) b) (E2::Op) c = b E1::Op (a (E2::Op) c)
+// (a (E2::Op) b) (E1::Op) c = b E2::Op (a (E1::Op) c)
+//
+// This is a difficult set of properties to satisfy, so currently this only
+// returns true when both operators are '+' or when both operators are '-'
 template <typename E1, typename E2>
 concept associative_commutative =
     is_expr_v<E1> && is_expr_v<E2> &&
