@@ -4,6 +4,14 @@ include(Catch)
 
 find_package(CGAL)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set(CMAKE_CXX_CLANG_TIDY
+    clang-tidy;
+    -format-style='file';
+    -header-filter=${CMAKE_SOURCE_DIR};
+  )
+endif()
+
 add_executable(tests test_adaptive_expr.cpp)
 target_link_libraries(tests PRIVATE adaptive_predicates shewchuk Catch2::Catch2WithMain)
 target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/extern)

@@ -4,6 +4,8 @@
 
 #include "ae_expr.hpp"
 
+#include <iostream>
+
 namespace adaptive_expr {
 
 //

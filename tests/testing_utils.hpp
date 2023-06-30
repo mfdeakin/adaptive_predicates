@@ -63,7 +63,7 @@ build_orient2d_matrix(const std::array<std::array<eval_type, 2>, 3> &points) {
 
 template <typename eval_type, typename row_exprs, std::size_t N>
 auto exchange_pivot(const mdspan<row_exprs, extents<std::size_t, N, N>> mtx) {
-  eval_type approx_val;
+  eval_type approx_val{0};
   decltype(adaptive_expr::balance_expr(mtx[0, 0])) v;
   std::size_t swap_row;
   for (swap_row = 0; swap_row < N && approx_val == eval_type{0}; ++swap_row) {

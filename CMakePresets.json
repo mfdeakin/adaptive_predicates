@@ -25,12 +25,21 @@
       }
     },
     {
+      "name": "profiling",
+      "hidden": true,
+      "displayName": "Profiling Config",
+      "description": "Profiling config",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "-fprofile-generate"
+      }
+    },
+    {
       "name": "gcc",
       "hidden": true,
       "displayName": "gcc Config",
       "description": "gcc config",
       "cacheVariables": {
-        "CMAKE_CXX_COMPILER": "g++-12"
+        "CMAKE_CXX_COMPILER": "g++"
       }
     },
     {
