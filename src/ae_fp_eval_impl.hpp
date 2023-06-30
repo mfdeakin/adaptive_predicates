@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <new>
 #include <ranges>
 #include <span>
 
@@ -197,18 +198,12 @@ auto merge_sum_linear(
 }
 
 auto merge_sum_append(auto begin, auto end, auto v) {
-  using eval_type = decltype(v);
-  auto out = begin;
   for (auto &e : std::span{begin, end}) {
     const auto [result, error] = dekker_sum(v, e);
-    e = eval_type{0.0};
+    e = error;
     v = result;
-    if (error) {
-      *out = error;
-      ++out;
-    }
   }
-  return std::pair{out, v};
+  return v;
 }
 
 auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
@@ -221,12 +216,9 @@ auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
                           })) {
       eval_type v = inp;
       inp = eval_type{0.0};
-      auto [new_out, result] = merge_sum_append(storage.begin(), out, v);
-      out = new_out;
-      if (result) {
-        *out = result;
-        ++out;
-      }
+      const auto result = merge_sum_append(storage.begin(), out, v);
+      *out = result;
+      ++out;
     }
     if (out == storage.begin()) {
       return eval_type{0};
