@@ -30,7 +30,8 @@
       "displayName": "Profiling Config",
       "description": "Profiling config",
       "cacheVariables": {
-        "CMAKE_CXX_FLAGS": "-fprofile-generate"
+        "ENABLE_PROFILING": "ON",
+        "OPTIMIZATION_REPORT": "ON"
       }
     },
     {
