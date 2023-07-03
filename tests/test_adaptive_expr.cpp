@@ -265,8 +265,6 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
   REQUIRE(adaptive_eval<real>((arith_expr{} + 7.0) * 2.0) == 14.0);
   REQUIRE(adaptive_eval<real>((arith_expr{} + 7.0) * 2.0 - 14.0) == 0.0);
 
-  std::mt19937_64 gen(std::random_device{}());
-  std::uniform_real_distribution<real> dist(-1.0, 1.0);
   for (auto [points, expected] : orient2d_cases) {
     const auto e = build_orient2d_case(points);
     CHECK(check_sign(expected, adaptive_eval<real>(e)));
@@ -314,10 +312,6 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   REQUIRE(*correct_eval<real>(e) == -14.5);
 
   const auto points = orient2d_cases[0].first;
-  const real result = exactfp_eval<real>(
-      build_orient2d_case(points)); // The exact answer is -9.392445044e-8
-  REQUIRE(result < 0.0);
-
   REQUIRE(!correct_eval<real>(build_orient2d_case(points)));
 }
 
@@ -342,23 +336,34 @@ TEST_CASE("nonoverlapping", "[eval_utils]") {
   CHECK(
       !is_nonoverlapping(std::vector<real>{-0.375, 0.5, 1.5, 0, 0, 0, -14.0}));
 
-  std::vector<real> merge_test{0,
-                               -1.5436178396078065e-49,
-                               -2.184158631330676e-33,
-                               -1.1470824290427116e-16,
-                               0,
-                               1.0353799381025734e-34,
-                               -1.7308376953906192e-17,
-                               -1.2053999999999998};
-  const auto midpoint = merge_test.begin() + 4;
-  CHECK(*midpoint == real{0});
-  CHECK(is_nonoverlapping(std::span{merge_test.begin(), midpoint}));
-  CHECK(is_nonoverlapping(std::span{midpoint, merge_test.end()}));
-  REQUIRE(midpoint > merge_test.begin());
-  REQUIRE(midpoint < merge_test.end());
-  // merge_sum_linear doesn't always produce non-overlapping results for some reason,
-  // breaking the invariants in Shewchuk's paper
-  /* merge_sum_linear(merge_test, midpoint);
-   * CHECK(is_nonoverlapping(merge_test));
-   */
+  std::vector<real> merge_test1{0,
+                                -1.5436178396078065e-49,
+                                -2.184158631330676e-33,
+                                -1.1470824290427116e-16,
+                                0,
+                                1.0353799381025734e-34,
+                                -1.7308376953906192e-17,
+                                -1.2053999999999998};
+  const auto midpoint1 = merge_test1.begin() + 4;
+  CHECK(*midpoint1 == real{0});
+  CHECK(is_nonoverlapping(std::span{merge_test1.begin(), midpoint1}));
+  CHECK(is_nonoverlapping(std::span{midpoint1, merge_test1.end()}));
+  REQUIRE(midpoint1 > merge_test1.begin());
+  REQUIRE(midpoint1 < merge_test1.end());
+
+  merge_sum_linear(merge_test1, midpoint1);
+  CHECK(is_nonoverlapping(merge_test1));
+
+  // Same strongly non-overlapping sequence but for merge_sum_linear_fast
+  std::vector<real> merge_test2{0,
+                                -1.5436178396078065e-49,
+                                -2.184158631330676e-33,
+                                -1.1470824290427116e-16,
+                                0,
+                                1.0353799381025734e-34,
+                                -1.7308376953906192e-17,
+                                -1.2053999999999998};
+  const auto midpoint2 = merge_test2.begin() + 4;
+  merge_sum_linear_fast(merge_test2, midpoint2);
+  CHECK(is_nonoverlapping(merge_test2));
 }

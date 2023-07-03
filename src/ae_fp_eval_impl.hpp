@@ -14,6 +14,14 @@ namespace adaptive_expr {
 
 namespace _impl {
 
+/* merge_sum_linear runs in-place in linear time, but requires the two sequences
+ * in storage to be strongly non-overlapping.
+ * That is, each sequence must be non-overlapping and elements which aren't
+ * powers of two must be non-adjacent. Elements which are powers of two can be
+ * adjacent to at most one other element in its sequence.
+ * Elements a, b with abs(a) < abs(b) are adjacent if (a, b) is overlapping or
+ * if (2 * a, b) is overlapping
+ */
 auto merge_sum_linear(
     std::ranges::range auto &&storage,
     const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
@@ -152,16 +160,29 @@ auto merge_sum_linear_fast(
     typename std::remove_cvref_t<decltype(storage)>::value_type {
   using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
-    std::ranges::inplace_merge(storage, midpoint, [](eval_type l, eval_type r) {
-      return std::abs(l) > std::abs(r);
-    });
-    auto [Q, _] = dekker_sum(storage[0], storage[1]);
-    for (auto g : storage | std::views::drop(2) |
-                      std::views::filter([](const eval_type v) {
-                        return v != eval_type{0};
-                      })) {
-      std::tie(Q, _) = dekker_sum(g, Q);
+    std::ranges::inplace_merge(
+        storage, midpoint, [](const eval_type &left, const eval_type &right) {
+          return std::abs(left) < std::abs(right);
+        });
+    auto nonzero_itr = storage.begin();
+    for (; nonzero_itr != storage.end() && *nonzero_itr == eval_type{0};
+         ++nonzero_itr) {
     }
+    std::ranges::rotate(storage, nonzero_itr);
+
+    auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
+    auto out = storage.begin();
+    *out = q;
+    ++out;
+    for (auto g : storage | std::views::drop(2)) {
+      auto [Qnew, h] = knuth_sum(Q, g);
+      Q = Qnew;
+      *out = h;
+      ++out;
+    }
+
+    *out = Q;
+    ++out;
     return Q;
   } else if (storage.size() == 1) {
     return storage[0];
@@ -180,14 +201,25 @@ auto merge_sum_linear(
         storage, midpoint, [](const eval_type &left, const eval_type &right) {
           return std::abs(left) < std::abs(right);
         });
+    auto nonzero_itr = storage.begin();
+    for (; nonzero_itr != storage.end() && *nonzero_itr == eval_type{0};
+         ++nonzero_itr) {
+    }
+    std::ranges::rotate(storage, nonzero_itr);
     auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
-    for (auto g : storage | std::views::drop(2) |
-                      std::views::filter([](const eval_type v) {
-                        return v != eval_type{0};
-                      })) {
-      auto [R, _] = dekker_sum_unchecked(g, q);
+    auto out = storage.begin();
+    for (auto h : storage | std::views::drop(2)) {
+      auto [R, g] = dekker_sum_unchecked(h, q);
+      *out = g;
+      ++out;
       std::tie(Q, q) = knuth_sum(Q, R);
     }
+
+    *out = q;
+    ++out;
+    *out = Q;
+    ++out;
+
     return Q;
   } else if (storage.size() == 1) {
     return storage[0];
