@@ -17,7 +17,7 @@
 using namespace adaptive_expr;
 
 TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
-  exactinit();
+  Shewchuk::exactinit();
   const auto points1 = orient2d_cases[0].first;
   constexpr std::size_t x = 0;
   constexpr std::size_t y = 1;
@@ -50,14 +50,16 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   };
   BENCHMARK("matrix adaptive 1") {
     auto mtx = build_orient2d_matrix(points1);
-    return determinant<real>(mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
+    return determinant<real>(
+        mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
   };
   BENCHMARK("shewchuk floating point 1") {
-    return orient2dfast(points1[0].data(), points1[1].data(),
-                        points1[2].data());
+    return Shewchuk::orient2dfast(points1[0].data(), points1[1].data(),
+                                  points1[2].data());
   };
   BENCHMARK("shewchuk exact rounded 1") {
-    return orient2d(points1[0].data(), points1[1].data(), points1[2].data());
+    return Shewchuk::orient2d(points1[0].data(), points1[1].data(),
+                              points1[2].data());
   };
   BENCHMARK("cgal exact rounded 1") {
     return CGAL::orientation(pt0, pt1, pt2);
@@ -93,14 +95,16 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   };
   BENCHMARK("matrix adaptive 2") {
     auto mtx = build_orient2d_matrix(points2);
-    return determinant<real>(mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
+    return determinant<real>(
+        mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
   };
   BENCHMARK("shewchuk floating point 2") {
-    return orient2dfast(points2[0].data(), points2[1].data(),
-                        points2[2].data());
+    return Shewchuk::orient2dfast(points2[0].data(), points2[1].data(),
+                                  points2[2].data());
   };
   BENCHMARK("shewchuk exact rounded 2") {
-    return orient2d(points2[0].data(), points2[1].data(), points2[2].data());
+    return Shewchuk::orient2d(points2[0].data(), points2[1].data(),
+                              points2[2].data());
   };
   BENCHMARK("cgal exact rounded 2") {
     return CGAL::orientation(pt0, pt1, pt2);
@@ -136,14 +140,16 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   };
   BENCHMARK("matrix adaptive 3") {
     auto mtx = build_orient2d_matrix(points3);
-    return determinant<real>(mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
+    return determinant<real>(
+        mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
   };
   BENCHMARK("shewchuk floating point 3") {
-    return orient2dfast(points3[0].data(), points3[1].data(),
-                        points3[2].data());
+    return Shewchuk::orient2dfast(points3[0].data(), points3[1].data(),
+                                  points3[2].data());
   };
   BENCHMARK("shewchuk exact rounded 3") {
-    return orient2d(points3[0].data(), points3[1].data(), points3[2].data());
+    return Shewchuk::orient2d(points3[0].data(), points3[1].data(),
+                              points3[2].data());
   };
   BENCHMARK("cgal exact rounded 3") {
     return CGAL::orientation(pt0, pt1, pt2);
