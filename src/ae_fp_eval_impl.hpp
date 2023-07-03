@@ -56,6 +56,12 @@ constexpr std::pair<eval_type, eval_type>
 dekker_sum_unchecked(const eval_type &lhs, const eval_type &rhs);
 
 template <std::floating_point eval_type>
+constexpr std::pair<eval_type, eval_type> two_sum(const eval_type &lhs,
+                                                  const eval_type &rhs) {
+  return knuth_sum(lhs, rhs);
+}
+
+template <std::floating_point eval_type>
 std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
                                            const eval_type &rhs);
 
@@ -175,7 +181,7 @@ auto merge_sum_linear_fast(
     *out = q;
     ++out;
     for (auto g : storage | std::views::drop(2)) {
-      auto [Qnew, h] = knuth_sum(Q, g);
+      auto [Qnew, h] = two_sum(Q, g);
       Q = Qnew;
       *out = h;
       ++out;
@@ -212,7 +218,7 @@ auto merge_sum_linear(
       auto [R, g] = dekker_sum_unchecked(h, q);
       *out = g;
       ++out;
-      std::tie(Q, q) = knuth_sum(Q, R);
+      std::tie(Q, q) = two_sum(Q, R);
     }
 
     *out = q;
@@ -232,7 +238,7 @@ auto merge_sum_append(auto begin, auto end, auto v) {
   using eval_type = decltype(v);
   auto out = begin;
   for (auto &e : std::span{begin, end}) {
-    const auto [result, error] = dekker_sum(v, e);
+    const auto [result, error] = two_sum(v, e);
     e = eval_type{0.0};
     v = result;
     if (error) {
