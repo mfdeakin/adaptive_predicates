@@ -7,6 +7,9 @@
 #include <ranges>
 #include <span>
 
+#include <fmt/format.h>
+#include <fmt/ranges.h>
+
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
 
@@ -26,9 +29,10 @@ auto merge_sum_linear(
     std::ranges::range auto &&storage,
     const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type;
-auto merge_sum_linear_fast(std::ranges::range auto &&storage,
-                           const typename decltype(storage)::iterator midpoint)
-    -> typename decltype(storage)::value_type;
+auto merge_sum_linear_fast(
+    std::ranges::range auto &&storage,
+    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
+    typename std::remove_cvref_t<decltype(storage)>::value_type;
 auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type;
 
@@ -143,6 +147,9 @@ constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
       for (eval_type &v : storage_right) {
         v = -v;
       }
+      merge_sum_linear_fast(partial_results, partial_results.begin() + reserve_left);
+    } else if constexpr (std::is_same_v<std::plus<>, Op>) {
+      merge_sum_linear_fast(partial_results, partial_results.begin() + reserve_left);
     } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
       const auto storage_mult = [partial_results]() {
         if constexpr (span_t::extent == std::dynamic_extent) {
@@ -293,16 +300,31 @@ void sparse_mult(span_l storage_left, span_r storage_right,
   // they've been multiplied If storage_left and storage_right are sorted by
   // increasing magnitude before multiplying, the first element in the output is
   // the least significant and the last element is the most significant
-  auto out_i = storage_mult.end() - 1;
-  for (auto l : storage_right | std::views::reverse) {
-    for (auto r : storage_left | std::views::reverse) {
+  using eval_type = typename span_l::value_type;
+  std::vector<eval_type> buffer(storage_left.size() + storage_right.size() +
+                                storage_mult.size());
+  auto out_written_end = buffer.begin();
+  for (auto r : storage_right) {
+    auto out_sig = out_written_end;
+    auto out_rem = out_sig + storage_left.size();
+    for (auto l : storage_left) {
       auto [upper, lower] = exact_mult(l, r);
-      *out_i = upper;
-      --out_i;
-      *out_i = lower;
-      --out_i;
+      *out_sig = upper;
+      ++out_sig;
+      *out_rem = lower;
+      ++out_rem;
     }
+    auto out_new_end = out_written_end + 2 * storage_left.size();
+    std::span new_products{out_written_end, out_new_end};
+    auto out_sig_end = new_products.begin() + storage_left.size();
+    merge_sum_linear_fast(new_products, out_sig_end);
+ 
+    std::span all_written{buffer.begin(), out_new_end};
+    auto new_written = all_written.begin() + (out_written_end - buffer.begin());
+    merge_sum_linear_fast(all_written, new_written);
+    out_written_end = out_new_end;
   }
+  std::ranges::copy(buffer, storage_left.begin());
 }
 
 template <std::floating_point eval_type>

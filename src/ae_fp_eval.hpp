@@ -3,6 +3,7 @@
 #define ADAPTIVE_PREDICATES_AE_FP_EVAL_HPP
 
 #include <algorithm>
+#include <numeric>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -46,9 +47,9 @@ constexpr eval_type exactfp_eval(E &&e) noexcept {
     std::span<eval_type, num_partials_for_exact<E>()> partial_span{
         partial_results};
     _impl::exactfp_eval_impl<eval_type>(std::forward<E>(e), partial_span);
-    return _impl::merge_sum(partial_span);
-    // return std::accumulate(partial_results.begin(), partial_results.end(),
-    // eval_type(0));
+    // return _impl::merge_sum(partial_span);
+    return std::accumulate(partial_results.begin(), partial_results.end(),
+                           eval_type(0));
   } else {
     return static_cast<eval_type>(e);
   }
