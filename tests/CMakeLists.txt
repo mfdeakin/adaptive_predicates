@@ -5,11 +5,14 @@ include(Catch)
 find_package(CGAL)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  set(CMAKE_CXX_CLANG_TIDY
-    clang-tidy;
-    -format-style='file';
-    -header-filter=${CMAKE_SOURCE_DIR};
-  )
+  option(CLANG_TIDY "Enable building with clang tidy's static analyzer" OFF)
+  if(CLANG_TIDY)
+    set(CMAKE_CXX_CLANG_TIDY
+      clang-tidy;
+      -format-style='file';
+      -header-filter=${CMAKE_SOURCE_DIR};
+    )
+  endif()
 endif()
 
 add_executable(tests test_adaptive_expr.cpp)
