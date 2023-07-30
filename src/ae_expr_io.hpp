@@ -83,13 +83,13 @@ struct fmt::formatter<adaptive_expr::arith_expr<Op, LHS, RHS>> {
   template <typename FormatContext>
   auto format(const adaptive_expr::arith_expr<Op, LHS, RHS> &e, FormatContext &ctx) const {
     if constexpr (std::floating_point<LHS> && std::floating_point<RHS>) {
-      return format_to(ctx.out(), "({: .17f} {} {: .17f})", e.lhs(), Op(), e.rhs());
+      return fmt::format_to(ctx.out(), "({: .67f} {} {: .67f})", e.lhs(), Op(), e.rhs());
     } else if constexpr (std::floating_point<LHS>) {
-      return format_to(ctx.out(), "({: .17f} {} {})", e.lhs(), Op(), e.rhs());
+      return fmt::format_to(ctx.out(), "({: .67f} {} {})", e.lhs(), Op(), e.rhs());
     } else if constexpr (std::floating_point<RHS>) {
-      return format_to(ctx.out(), "({} {} {: .17f})", e.lhs(), Op(), e.rhs());
+      return fmt::format_to(ctx.out(), "({} {} {: .67f})", e.lhs(), Op(), e.rhs());
     } else {
-      return format_to(ctx.out(), "({} {} {})", e.lhs(), Op(), e.rhs());
+      return fmt::format_to(ctx.out(), "({} {} {})", e.lhs(), Op(), e.rhs());
     }
   }
 };
