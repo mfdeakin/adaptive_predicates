@@ -110,7 +110,7 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
     return CGAL::orientation(pt0, pt1, pt2);
   };
 
-  const auto points3 = orient2d_cases[15].first;
+  const auto points3 = orient2d_cases[2].first;
   pt0 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
       points3[0][x], points3[0][y]);
   pt1 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
@@ -152,6 +152,51 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
                               points3[2].data());
   };
   BENCHMARK("cgal exact rounded 3") {
+    return CGAL::orientation(pt0, pt1, pt2);
+  };
+
+  const auto points4 = orient2d_cases[17].first;
+  pt0 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
+      points4[0][x], points4[0][y]);
+  pt1 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
+      points4[1][x], points4[1][y]);
+  pt2 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
+      points4[2][x], points4[2][y]);
+  BENCHMARK("build expr 4") { return build_orient2d_case(points4); };
+  BENCHMARK("no expr floating point 4") {
+    return points4[1][x] * points4[2][y] - points4[1][y] * points4[2][x] -
+           points4[0][x] * points4[2][y] + points4[0][y] * points4[2][x] +
+           points4[0][x] * points4[1][y] - points4[0][y] * points4[1][x];
+  };
+  BENCHMARK("floating point 4") {
+    const auto e = build_orient2d_case(points4);
+    return fp_eval<real>(e);
+  };
+  BENCHMARK("correct or nothing 4") {
+    return correct_eval<real>(build_orient2d_case(points4));
+  };
+  BENCHMARK("exact rounded 4") {
+    const auto e = build_orient2d_case(points4);
+    return exactfp_eval<real>(e);
+  };
+  BENCHMARK("adaptive 4") {
+    const auto e = build_orient2d_case(points4);
+    return adaptive_eval<real>(e);
+  };
+  BENCHMARK("matrix adaptive 4") {
+    auto mtx = build_orient2d_matrix(points4);
+    return determinant<real>(
+        mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
+  };
+  BENCHMARK("shewchuk floating point 4") {
+    return Shewchuk::orient2dfast(points4[0].data(), points4[1].data(),
+                                  points4[2].data());
+  };
+  BENCHMARK("shewchuk exact rounded 4") {
+    return Shewchuk::orient2d(points4[0].data(), points4[1].data(),
+                              points4[2].data());
+  };
+  BENCHMARK("cgal exact rounded 4") {
     return CGAL::orientation(pt0, pt1, pt2);
   };
 }

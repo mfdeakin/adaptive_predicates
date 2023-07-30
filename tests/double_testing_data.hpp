@@ -11,6 +11,8 @@ constexpr auto orient2d_cases = std::array{
                          std::array<real, 2>{-1.76, 7.34},
                          std::array<real, 2>{-3.04, 9.07}},
               real{-3.2986}},
+
+    // Requires Shewchuk's adaptive code
     std::pair{
         std::array{
             std::array<real, 2>{
@@ -23,6 +25,34 @@ constexpr auto orient2d_cases = std::array{
                 -0.61524161459544834951174152593011967837810516357421875,
                 -0.080749560570702871853399074097978882491588592529296875}},
         real{0.0}},
+    std::pair{
+        std::array{
+            std::array<real, 2>{
+                8.9206115367857530262796217357390560209751129150390625e-01,
+                9.5046631112696389198646329532493837177753448486328125e-01},
+            std::array<real, 2>{
+                8.920611536785754136502646360895596444606781005859375e-01,
+                9.504663111269640030087657578405924141407012939453125e-01},
+            std::array<real, 2>{
+                2.773088457873296164279963704757392406463623046875e-01,
+                -3.756180752683186963025718796416185796260833740234375e-01}},
+        real{
+            -7.897372517096511469348533961070020103539467105305954541805136e-17}},
+    std::pair{
+        std::array{
+            std::array<real, 2>{
+                -7.659513984137501507731826677627395838499069213867187500000000e-01,
+                -4.645375747168434266143322020070627331733703613281250000000000e-02},
+            std::array<real, 2>{
+                -7.659513984137502617954851302783936262130737304687500000000000e-01,
+                -4.645375747168434266143322020070627331733703613281250000000000e-02},
+            std::array<real, 2>{
+                -3.889673353170396419287158096267376095056533813476562500000000e-01,
+                -3.265389194899507296909746401070151478052139282226562500000000e-01}},
+        real{
+            3.109569957285467223568236282486108851140525955901103283274267e-17}},
+
+    // Filtered out by Shewchuk's code, regular floating point arithmetic only
     std::pair{
         std::array{std::array<real, 2>{
                        -0.136128279746752678391885638120584189891815185546875,
@@ -250,21 +280,21 @@ constexpr auto orient2d_cases = std::array{
 };
 
 constexpr auto in_circle2d_cases = std::array{
-    std::pair{
-        std::array{
-            std::array<real, 2>{1.0, 1.0}, std::array<real, 2>{-1.0, 1.0},
-            std::array<real, 2>{-1.0, -1.0}, std::array<real, 2>{1.0, -1.0}},
-        real{0.0}},
-    std::pair{
-        std::array{
-            std::array<real, 2>{1.0, 1.0}, std::array<real, 2>{-1.0, 1.0},
-            std::array<real, 2>{-1.0, -1.0}, std::array<real, 2>{1.0, -2.0}},
-        real{1.0}},
-    std::pair{
-        std::array{
-            std::array<real, 2>{1.0, 1.0}, std::array<real, 2>{-1.0, 1.0},
-            std::array<real, 2>{-1.0, -1.0}, std::array<real, 2>{1.0, -0.5}},
-        real{-1.0}},
+    std::pair{std::array{std::array<real, 2>{1.0, 1.0},
+                         std::array<real, 2>{-1.0, 1.0},
+                         std::array<real, 2>{-1.0, -1.0},
+                         std::array<real, 2>{1.0, -1.0}},
+              real{0.0}},
+    std::pair{std::array{std::array<real, 2>{1.0, 1.0},
+                         std::array<real, 2>{-1.0, 1.0},
+                         std::array<real, 2>{-1.0, -1.0},
+                         std::array<real, 2>{1.0, -2.0}},
+              real{1.0}},
+    std::pair{std::array{std::array<real, 2>{1.0, 1.0},
+                         std::array<real, 2>{-1.0, 1.0},
+                         std::array<real, 2>{-1.0, -1.0},
+                         std::array<real, 2>{1.0, -0.5}},
+              real{-1.0}},
     std::pair{
         std::array{
             std::array<real, 2>{
