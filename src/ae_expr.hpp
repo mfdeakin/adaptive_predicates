@@ -8,19 +8,19 @@
 
 namespace adaptive_expr {
 
-template <typename Op_, typename LHS_, typename RHS_> class arith_expr {
+template <typename Op_, typename LHS_, typename RHS_> class arith_expr final {
 public:
   using LHS = std::remove_cvref_t<LHS_>;
   using RHS = std::remove_cvref_t<RHS_>;
   using Op = std::remove_cvref_t<Op_>;
 
   constexpr arith_expr() = default;
-  ~arith_expr() = default;
+  constexpr ~arith_expr() = default;
 
   constexpr arith_expr(const arith_expr &e) = default;
   constexpr arith_expr(arith_expr &&e) = default;
-  constexpr arith_expr& operator=(const arith_expr &e) = default;
-  constexpr arith_expr& operator=(arith_expr &&e) = default;
+  constexpr arith_expr &operator=(const arith_expr &e) = default;
+  constexpr arith_expr &operator=(arith_expr &&e) = default;
 
   constexpr arith_expr(const LHS &lhs, const RHS &rhs)
       : m_lhs(lhs), m_rhs(rhs) {}
@@ -80,7 +80,8 @@ template <typename Op, typename LHS_, typename RHS_>
 auto make_expr(LHS_ &&lhs, RHS_ &&rhs) {
   using LHS = std::remove_cvref_t<LHS_>;
   using RHS = std::remove_cvref_t<RHS_>;
-  return arith_expr<Op, LHS, RHS>(std::forward<LHS_>(lhs), std::forward<RHS_>(rhs));
+  return arith_expr<Op, LHS, RHS>(std::forward<LHS_>(lhs),
+                                  std::forward<RHS_>(rhs));
 }
 
 template <typename LHS, typename RHS> auto plus_expr(LHS &&lhs, RHS &&rhs) {
