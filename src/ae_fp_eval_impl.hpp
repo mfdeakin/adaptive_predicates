@@ -294,9 +294,9 @@ void sparse_mult(span_l storage_left, span_r storage_right,
   // increasing magnitude before multiplying, the first element in the output is
   // the least significant and the last element is the most significant
   auto out_i = storage_mult.end() - 1;
-  for (auto l : storage_right | std::views::reverse) {
-    for (auto r : storage_left | std::views::reverse) {
-      auto [upper, lower] = exact_mult(l, r);
+  for (auto r : storage_right | std::views::reverse) {
+    for (auto l : storage_left | std::views::reverse) {
+      auto [upper, lower] = exact_mult(r, l);
       *out_i = upper;
       --out_i;
       *out_i = lower;
