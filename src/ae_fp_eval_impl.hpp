@@ -156,7 +156,7 @@ constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
       sparse_mult(storage_left, storage_right, storage_mult);
     }
   } else if constexpr (!std::is_same_v<additive_id, E>) {
-    *partial_results.begin() = eval_type(e);
+    partial_results[0] = eval_type(e);
   }
 }
 
