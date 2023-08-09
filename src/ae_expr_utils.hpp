@@ -314,6 +314,38 @@ template <typename E_> consteval std::size_t num_partials_for_exact() {
   }
 }
 
+template <typename E_> consteval std::size_t exact_fp_latency() {
+  using E = std::remove_cvref_t<E_>;
+  if constexpr (is_expr_v<E>) {
+    using Op = typename E::Op;
+    using LHS = typename E::LHS;
+    using RHS = typename E::RHS;
+    const std::size_t left_ops = exact_fp_latency<LHS>();
+    const std::size_t right_ops = exact_fp_latency<RHS>();
+
+    if constexpr (std::is_same_v<std::plus<>, Op>) {
+      return left_ops + right_ops;
+    } else {
+      const std::size_t left_mem = num_partials_for_exact<LHS>();
+      const std::size_t right_mem = num_partials_for_exact<RHS>();
+
+      // multiplication and fma have a latency of 4
+      const std::size_t mult_cost = 4;
+      const std::size_t negate_cost = 1;
+      if (std::is_same_v<std::minus<>, Op>) {
+        return left_ops + right_ops + negate_cost * right_mem;
+      } else if (std::is_same_v<std::multiplies<>, Op>) {
+        // exact_mult has 1 mult, 1 fma, and 1 negation; this is done with
+        // every pair of elements of left and right
+        return (2 * mult_cost + negate_cost) * left_mem * right_mem + left_ops +
+               right_ops;
+      }
+    }
+  } else {
+    return 0;
+  }
+}
+
 class branch_token_s {};
 
 template <typename S>

@@ -103,6 +103,65 @@ private:
                               std::numeric_limits<eval_type>::epsilon() / 2.0};
   }
 
+  template <branch_token branch>
+  std::pair<eval_type, eval_type>
+  handle_overshoot(expr_type auto &&expr, const eval_type result,
+                   const eval_type left_result, const eval_type left_abs_err,
+                   const eval_type right_result, const eval_type right_abs_err,
+                   const eval_type max_abs_err) {
+    using sub_expr_ = decltype(expr);
+    using sub_expr = std::remove_cvref_t<sub_expr_>;
+    if constexpr (num_partials_for_exact<sub_expr>() > 8 &&
+                  is_expr_v<typename sub_expr::LHS> &&
+                  is_expr_v<typename sub_expr::RHS>) {
+      using Op = typename sub_expr::Op;
+      using left_branch =
+          typename branch::template append_branch<branch_token_left>;
+      using right_branch =
+          typename branch::template append_branch<branch_token_right>;
+      // We need to reduce error efficiently, so don't just exactly evaluate
+      // the whole expression, try to only evaluate the largest contributor
+      // to the error
+      const auto [left_contrib, right_contrib] = _impl::error_contributions<Op>(
+          left_result, left_abs_err, right_result, right_abs_err);
+      const eval_type left_overshoot =
+          _impl::error_overshoot(result, left_contrib);
+      const eval_type right_overshoot =
+          _impl::error_overshoot(result, right_contrib);
+      if (left_overshoot < 0.0 || right_overshoot < 0.0) {
+        if (left_overshoot > right_overshoot) {
+          // This comparison gaurantees that we exactly evaluate left or
+          // right if they cause an overshoot greater than 0 It also
+          // guarantees we deal with the largest part of the error, making
+          // the fall-through case very unlikely
+          const auto [new_left, new_left_err] =
+              exact_eval_root<left_branch>(expr.lhs());
+
+          const auto [new_result, new_abs_err] =
+              _impl::eval_with_max_abs_err<Op>(new_left, new_left_err,
+                                               right_result, right_abs_err);
+          const eval_type new_overshoot =
+              _impl::error_overshoot(new_result, new_abs_err);
+          if (new_overshoot < 0.0) {
+            return {new_result, new_abs_err};
+          }
+        } else {
+          const auto [new_right, new_right_err] =
+              exact_eval_root<right_branch>(expr.rhs());
+          const auto [new_result, new_abs_err] =
+              _impl::eval_with_max_abs_err<Op>(left_result, left_abs_err,
+                                               new_right, new_right_err);
+          const eval_type new_overshoot =
+              _impl::error_overshoot(new_result, new_abs_err);
+          if (new_overshoot < 0.0) {
+            return {new_result, new_abs_err};
+          }
+        }
+      }
+    }
+    return exact_eval_root<branch>(std::forward<sub_expr_>(expr));
+  }
+
   // Returns the result and maximum absolute error from computing the expression
   template <branch_token branch = branch_token_leaf>
   std::pair<eval_type, eval_type> eval_impl(evaluatable auto &&expr) {
@@ -128,53 +187,9 @@ private:
 
       const eval_type overshoot = _impl::error_overshoot(result, max_abs_err);
       if (overshoot > 0.0) {
-        // We need to reduce error efficiently, so don't just exactly evaluate
-        // the whole expression, try to only evaluate the largest contributor to
-        // the error
-        const auto [left_contrib, right_contrib] =
-            _impl::error_contributions<Op>(left_result, left_abs_err,
-                                           right_result, right_abs_err);
-        const eval_type left_overshoot =
-            _impl::error_overshoot(result, left_contrib);
-        const eval_type right_overshoot =
-            _impl::error_overshoot(result, right_contrib);
-        if (left_overshoot < 0.0 || right_overshoot < 0.0) {
-          if (left_overshoot > right_overshoot) {
-            // This comparison gaurantees that we exactly evaluate left or right
-            // if they cause an overshoot greater than 0
-            // It also guarantees we deal with the largest part of the error,
-            // making the fall-through case very unlikely
-            if constexpr (is_expr_v<typename sub_expr::LHS>) {
-              // Guaranteed to be true given the previous; but the compiler
-              // needs this
-              const auto [new_left, new_left_err] =
-                  exact_eval_root<left_branch>(expr.lhs());
-
-              const auto [new_result, new_abs_err] =
-                  _impl::eval_with_max_abs_err<Op>(new_left, new_left_err,
-                                                   right_result, right_abs_err);
-              const eval_type new_overshoot =
-                  _impl::error_overshoot(new_result, new_abs_err);
-              if (new_overshoot < 0.0) {
-                return {new_result, new_abs_err};
-              }
-            }
-          } else {
-            if constexpr (is_expr_v<typename sub_expr::RHS>) {
-              const auto [new_right, new_right_err] =
-                  exact_eval_root<right_branch>(expr.rhs());
-              const auto [new_result, new_abs_err] =
-                  _impl::eval_with_max_abs_err<Op>(left_result, left_abs_err,
-                                                   new_right, new_right_err);
-              const eval_type new_overshoot =
-                  _impl::error_overshoot(new_result, new_abs_err);
-              if (new_overshoot < 0.0) {
-                return {new_result, new_abs_err};
-              }
-            }
-          }
-        }
-        return exact_eval_root<branch>(std::forward<sub_expr_>(expr));
+        return handle_overshoot<branch>(expr, result, left_result, left_abs_err,
+                                        right_result, right_abs_err,
+                                        max_abs_err);
       } else {
         return {result, max_abs_err};
       }

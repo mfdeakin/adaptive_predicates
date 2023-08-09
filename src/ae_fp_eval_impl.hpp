@@ -58,7 +58,7 @@ dekker_sum_unchecked(const eval_type &lhs, const eval_type &rhs);
 template <std::floating_point eval_type>
 constexpr std::pair<eval_type, eval_type> two_sum(const eval_type &lhs,
                                                   const eval_type &rhs) {
-  return knuth_sum(lhs, rhs);
+  return dekker_sum(lhs, rhs);
 }
 
 template <std::floating_point eval_type>
@@ -123,9 +123,9 @@ template <typename Op, arith_number eval_type>
 constexpr std::pair<eval_type, eval_type>
 eval_with_max_abs_err(const eval_type left, const eval_type left_abs_err,
                       const eval_type right, const eval_type right_abs_err) {
-  const eval_type result = Op()(left, right);
   const auto [left_contrib, right_contrib] =
       error_contributions<Op>(left, left_abs_err, right, right_abs_err);
+  const eval_type result = Op()(left, right);
   return {result,
           left_contrib + right_contrib +
               std::abs(result) * std::numeric_limits<eval_type>::epsilon() / 2};
@@ -134,9 +134,7 @@ eval_with_max_abs_err(const eval_type left, const eval_type left_abs_err,
 constexpr auto error_overshoot(const arith_number auto result,
                                const arith_number auto max_abs_err) {
   using eval_type = decltype(result);
-  return max_abs_err -
-         std::abs(result) *
-             eval_type(1.0 - std::numeric_limits<eval_type>::epsilon());
+  return max_abs_err - std::abs(result);
 }
 
 template <std::floating_point eval_type, typename E_, std::ranges::range span_t>
