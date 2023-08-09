@@ -106,22 +106,37 @@ consteval eval_type max_rel_error() {
 
 template <typename Op, arith_number eval_type>
 constexpr std::pair<eval_type, eval_type>
+error_contributions(const eval_type left, const eval_type left_abs_err,
+                    const eval_type right, const eval_type right_abs_err) {
+  if constexpr (std::is_same_v<Op, std::plus<>> ||
+                std::is_same_v<Op, std::minus<>>) {
+    return {left_abs_err, right_abs_err};
+  } else if constexpr (std::is_same_v<Op, std::multiplies<>>) {
+    return {right * left_abs_err, left * right_abs_err};
+  } else {
+    return {std::numeric_limits<eval_type>::signaling_NaN(),
+            std::numeric_limits<eval_type>::signaling_NaN()};
+  }
+}
+
+template <typename Op, arith_number eval_type>
+constexpr std::pair<eval_type, eval_type>
 eval_with_max_abs_err(const eval_type left, const eval_type left_abs_err,
                       const eval_type right, const eval_type right_abs_err) {
   const eval_type result = Op()(left, right);
-  if constexpr (std::is_same_v<Op, std::plus<>> ||
-                std::is_same_v<Op, std::minus<>>) {
-    return {result, left_abs_err + right_abs_err +
-                        std::abs(result) *
-                            std::numeric_limits<eval_type>::epsilon() / 2};
-  } else if constexpr (std::is_same_v<Op, std::multiplies<>>) {
-    return {result, right * left_abs_err + left * right_abs_err +
-                        left_abs_err * right_abs_err +
-                        std::abs(result) *
-                            std::numeric_limits<eval_type>::epsilon() / 2};
-  } else {
-    return {result, std::numeric_limits<eval_type>::signaling_NaN()};
-  }
+  const auto [left_contrib, right_contrib] =
+      error_contributions<Op>(left, left_abs_err, right, right_abs_err);
+  return {result,
+          left_contrib + right_contrib +
+              std::abs(result) * std::numeric_limits<eval_type>::epsilon() / 2};
+}
+
+constexpr auto error_overshoot(const arith_number auto result,
+                               const arith_number auto max_abs_err) {
+  using eval_type = decltype(result);
+  return max_abs_err -
+         std::abs(result) *
+             eval_type(1.0 - std::numeric_limits<eval_type>::epsilon());
 }
 
 template <std::floating_point eval_type, typename E_, std::ranges::range span_t>

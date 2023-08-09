@@ -69,6 +69,9 @@ template <typename T>
 concept arith_number = std::signed_integral<std::remove_cvref_t<T>> ||
                        std::floating_point<std::remove_cvref_t<T>>;
 
+template <typename E>
+concept evaluatable = expr_type<E> || arith_number<E>;
+
 template <typename LHS, typename RHS>
 concept arith_expr_operands =
     (expr_type<LHS> && (expr_type<RHS> || arith_number<RHS>)) ||
