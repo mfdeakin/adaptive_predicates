@@ -90,7 +90,7 @@ private:
   }
 
   template <branch_token branch>
-  std::pair<eval_type, eval_type> exact_eval_root(auto &&expr) {
+  std::pair<eval_type, eval_type> exact_eval_root(evaluatable auto &&expr) {
     using sub_expr = decltype(expr);
     branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
     auto memory = get_memory<branch>();
@@ -121,10 +121,8 @@ private:
           typename branch::template append_branch<branch_token_left>;
       using right_branch =
           typename branch::template append_branch<branch_token_right>;
-      auto [left_result, left_abs_err] =
-          eval_impl<left_branch>(expr.lhs());
-      auto [right_result, right_abs_err] =
-          eval_impl<right_branch>(expr.rhs());
+      auto [left_result, left_abs_err] = eval_impl<left_branch>(expr.lhs());
+      auto [right_result, right_abs_err] = eval_impl<right_branch>(expr.rhs());
       const auto [result, max_abs_err] = _impl::eval_with_max_abs_err<Op>(
           left_result, left_abs_err, right_result, right_abs_err);
 
@@ -146,28 +144,34 @@ private:
             // if they cause an overshoot greater than 0
             // It also guarantees we deal with the largest part of the error,
             // making the fall-through case very unlikely
-            // const auto [new_left, new_left_err] =
-            //     exact_eval_root<left_branch>(expr.lhs());
+            if constexpr (is_expr_v<typename sub_expr::LHS>) {
+              // Guaranteed to be true given the previous; but the compiler
+              // needs this
+              const auto [new_left, new_left_err] =
+                  exact_eval_root<left_branch>(expr.lhs());
 
-            // const auto [new_result, new_abs_err] =
-            //     _impl::eval_with_max_abs_err<Op>(new_left, new_left_err,
-            //                                      right_result, right_abs_err);
-            // const eval_type new_overshoot =
-            //     _impl::error_overshoot(new_result, new_abs_err);
-            // if (new_overshoot < 0.0) {
-            //   return {new_result, new_abs_err};
-            // }
+              const auto [new_result, new_abs_err] =
+                  _impl::eval_with_max_abs_err<Op>(new_left, new_left_err,
+                                                   right_result, right_abs_err);
+              const eval_type new_overshoot =
+                  _impl::error_overshoot(new_result, new_abs_err);
+              if (new_overshoot < 0.0) {
+                return {new_result, new_abs_err};
+              }
+            }
           } else {
-            // const auto [new_right, new_right_err] =
-            //     exact_eval_root<right_branch>(expr.rhs());
-            // const auto [new_result, new_abs_err] =
-            //     _impl::eval_with_max_abs_err<Op>(left_result, left_abs_err,
-            //                                      new_right, new_right_err);
-            // const eval_type new_overshoot =
-            //     _impl::error_overshoot(new_result, new_abs_err);
-            // if (new_overshoot < 0.0) {
-            //   return {new_result, new_abs_err};
-            // }
+            if constexpr (is_expr_v<typename sub_expr::RHS>) {
+              const auto [new_right, new_right_err] =
+                  exact_eval_root<right_branch>(expr.rhs());
+              const auto [new_result, new_abs_err] =
+                  _impl::eval_with_max_abs_err<Op>(left_result, left_abs_err,
+                                                   new_right, new_right_err);
+              const eval_type new_overshoot =
+                  _impl::error_overshoot(new_result, new_abs_err);
+              if (new_overshoot < 0.0) {
+                return {new_result, new_abs_err};
+              }
+            }
           }
         }
         return exact_eval_root<branch>(std::forward<sub_expr_>(expr));
