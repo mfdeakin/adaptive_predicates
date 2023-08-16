@@ -36,13 +36,15 @@ constexpr auto
 build_orient2d_case(const std::array<std::array<eval_type, 2>, 3> &points) {
   constexpr std::size_t x = 0;
   constexpr std::size_t y = 1;
-  const auto cross_expr = [](const std::array<eval_type, 2> &lhs,
-                             const std::array<eval_type, 2> &rhs) constexpr {
+  const std::array v1{adaptive_expr::minus_expr(points[1][x], points[0][x]),
+                      adaptive_expr::minus_expr(points[1][y], points[0][y])};
+  const std::array v2{adaptive_expr::minus_expr(points[2][x], points[0][x]),
+                      adaptive_expr::minus_expr(points[2][y], points[0][y])};
+  const auto cross_expr = [](const auto &lhs, const auto &rhs) constexpr {
     return adaptive_expr::mult_expr(lhs[x], rhs[y]) -
            adaptive_expr::mult_expr(lhs[y], rhs[x]);
   };
-  return cross_expr(points[1], points[2]) - cross_expr(points[0], points[2]) +
-         cross_expr(points[0], points[1]);
+  return cross_expr(v1, v2);
 }
 
 template <adaptive_expr::arith_number eval_type>
