@@ -111,10 +111,19 @@ private:
                    const eval_type max_abs_err) {
     using sub_expr_ = decltype(expr);
     using sub_expr = std::remove_cvref_t<sub_expr_>;
-    if constexpr (num_partials_for_exact<sub_expr>() > 8 &&
-                  is_expr_v<typename sub_expr::LHS> &&
-                  is_expr_v<typename sub_expr::RHS>) {
-      using Op = typename sub_expr::Op;
+    using LHS = typename sub_expr::LHS;
+    using RHS = typename sub_expr::RHS;
+    using Op = typename sub_expr::Op;
+
+    constexpr std::size_t subexpr_choice_latency =
+        std::max(exact_fp_rounding_latency<LHS>(),
+                 exact_fp_rounding_latency<RHS>()) +
+        2 * overshoot_latency() + 2 * cmp_latency() +
+        error_contrib_latency<Op>();
+
+    if constexpr (exact_fp_rounding_latency<sub_expr>() >
+                      subexpr_choice_latency &&
+                  is_expr_v<LHS> && is_expr_v<RHS>) {
       using left_branch =
           typename branch::template append_branch<branch_token_left>;
       using right_branch =
