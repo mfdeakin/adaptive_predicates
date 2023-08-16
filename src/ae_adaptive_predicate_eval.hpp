@@ -194,14 +194,17 @@ private:
       const auto [result, max_abs_err] = _impl::eval_with_max_abs_err<Op>(
           left_result, left_abs_err, right_result, right_abs_err);
 
-      const eval_type overshoot = _impl::error_overshoot(result, max_abs_err);
-      if (overshoot > 0.0) {
-        return handle_overshoot<branch>(expr, result, left_result, left_abs_err,
-                                        right_result, right_abs_err,
-                                        max_abs_err);
-      } else {
-        return {result, max_abs_err};
+      // Multiplication doesn't affect the final sign, so don't exactly evaluate
+      // it unless the upper part of the expression requires it
+      if constexpr (!std::is_same_v<std::multiplies<>, Op>) {
+        const eval_type overshoot = _impl::error_overshoot(result, max_abs_err);
+        if (overshoot > 0.0) {
+          return handle_overshoot<branch>(expr, result, left_result,
+                                          left_abs_err, right_result,
+                                          right_abs_err, max_abs_err);
+        }
       }
+      return {result, max_abs_err};
     } else {
       return {expr, 0.0};
     }
