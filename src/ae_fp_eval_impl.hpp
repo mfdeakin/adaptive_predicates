@@ -112,7 +112,7 @@ error_contributions(const eval_type left, const eval_type left_abs_err,
                 std::is_same_v<Op, std::minus<>>) {
     return {left_abs_err, right_abs_err};
   } else if constexpr (std::is_same_v<Op, std::multiplies<>>) {
-    return {right * left_abs_err, left * right_abs_err};
+    return {std::abs(right) * left_abs_err, std::abs(left) * right_abs_err};
   } else {
     return {std::numeric_limits<eval_type>::signaling_NaN(),
             std::numeric_limits<eval_type>::signaling_NaN()};
@@ -133,7 +133,6 @@ eval_with_max_abs_err(const eval_type left, const eval_type left_abs_err,
 
 constexpr auto error_overshoot(const arith_number auto result,
                                const arith_number auto max_abs_err) {
-  using eval_type = decltype(result);
   return max_abs_err - std::abs(result);
 }
 
