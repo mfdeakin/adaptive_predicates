@@ -314,6 +314,31 @@ template <typename E_> consteval std::size_t num_partials_for_exact() {
   }
 }
 
+template <typename Op> consteval std::size_t op_latency() {
+  if constexpr (std::is_same_v<std::plus<>, Op> ||
+                std::is_same_v<std::minus<>, Op>) {
+    return 1;
+  } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
+    return 4;
+  }
+}
+
+template <typename Op> consteval std::size_t error_contrib_latency() {
+  if constexpr (std::is_same_v<std::plus<>, Op> ||
+                std::is_same_v<std::minus<>, Op>) {
+    return 0;
+  } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
+    return 2 * op_latency<Op>();
+  }
+}
+
+consteval std::size_t cmp_latency() { return 1; }
+consteval std::size_t abs_latency() { return 1; }
+consteval std::size_t fma_latency() { return 4; }
+consteval std::size_t overshoot_latency() {
+  return abs_latency() + op_latency<std::plus<>>();
+}
+
 template <typename E_> consteval std::size_t exact_fp_latency() {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr_v<E>) {
@@ -329,18 +354,37 @@ template <typename E_> consteval std::size_t exact_fp_latency() {
       const std::size_t left_mem = num_partials_for_exact<LHS>();
       const std::size_t right_mem = num_partials_for_exact<RHS>();
 
-      // multiplication and fma have a latency of 4
-      const std::size_t mult_cost = 4;
-      const std::size_t negate_cost = 1;
       if (std::is_same_v<std::minus<>, Op>) {
-        return left_ops + right_ops + negate_cost * right_mem;
+        return left_ops + right_ops + op_latency<std::minus<>>() * right_mem;
       } else if (std::is_same_v<std::multiplies<>, Op>) {
         // exact_mult has 1 mult, 1 fma, and 1 negation; this is done with
         // every pair of elements of left and right
-        return (2 * mult_cost + negate_cost) * left_mem * right_mem + left_ops +
-               right_ops;
+        return (fma_latency() + op_latency<std::multiplies<>>() +
+                op_latency<std::minus<>>()) *
+                   left_mem * right_mem +
+               left_ops + right_ops;
       }
     }
+  } else {
+    return 0;
+  }
+}
+
+template <typename E_> consteval std::size_t exact_fp_rounding_latency() {
+  using E = std::remove_cvref_t<E_>;
+  if constexpr (is_expr_v<E>) {
+    const std::size_t fp_vals = num_partials_for_exact<E>();
+    // dekker_sum has 2 additions, 2 abs(), 1 comparison.
+    // Assume branch prediction is optimized away
+    const std::size_t two_sum_cost =
+        2 * op_latency<std::plus<>>() + 2 * abs_latency() + cmp_latency();
+
+    const std::size_t exact_latency = exact_fp_latency<E_>();
+    // Note that this ignores the zero elimination and is overly pessimistic
+    const std::size_t merge_latency =
+        two_sum_cost * fp_vals * (fp_vals - 1) / 2;
+    const std::size_t accumulate_latency = fp_vals - 1;
+    return exact_latency + merge_latency + accumulate_latency;
   } else {
     return 0;
   }
