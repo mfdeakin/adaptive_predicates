@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <ranges>
 #include <span>
 
@@ -31,10 +32,12 @@ auto merge_sum_linear_fast(std::ranges::range auto &&storage,
     -> typename decltype(storage)::value_type;
 auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type;
+auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage) ->
+    typename std::remove_cvref_t<decltype(storage)>::value_type;
 
 auto merge_sum(std::ranges::range auto storage) ->
     typename decltype(storage)::value_type {
-  return merge_sum_quadratic(storage);
+  return merge_sum_quadratic_keep_zeros(storage);
 }
 
 template <std::ranges::range span_l, std::ranges::range span_r,
@@ -283,6 +286,32 @@ auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
     } else {
       return *(out - 1);
     }
+  } else if (storage.size() == 1) {
+    return storage[0];
+  } else {
+    return eval_type{0.0};
+  }
+}
+
+auto merge_sum_append_keep_zeros(auto begin, auto end) {
+  auto v = *end;
+  using eval_type = decltype(v);
+  for (auto &e : std::span{begin, end}) {
+    const auto [result, error] = two_sum(v, e);
+    e = error;
+    v = result;
+  }
+  return v;
+}
+
+auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage) ->
+    typename std::remove_cvref_t<decltype(storage)>::value_type {
+  using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
+  if (storage.size() > 1) {
+    for (auto inp = storage.begin(); inp != storage.end(); ++inp) {
+      *inp = merge_sum_append_keep_zeros(storage.begin(), inp);
+    }
+    return std::reduce(storage.begin(), storage.end());
   } else if (storage.size() == 1) {
     return storage[0];
   } else {
