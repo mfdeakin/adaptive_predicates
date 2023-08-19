@@ -49,10 +49,11 @@ template <std::ranges::range span_l, std::ranges::range span_r,
 void sparse_mult(span_l storage_left, span_r storage_right,
                  span_m storage_mult);
 
-template <std::floating_point eval_type>
+template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
                                                     const eval_type &rhs);
-template <std::floating_point eval_type>
+template <arith_number eval_type>
+requires (!vector_type<eval_type>)
 constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
                                                      const eval_type &rhs);
 template <vector_type eval_type>
@@ -67,7 +68,7 @@ template <typename eval_type>
 constexpr std::pair<eval_type, eval_type> two_sum(const eval_type &lhs,
                                                   const eval_type &rhs) {
   if constexpr (vector_type<eval_type>) {
-    return dekker_sum_vector(lhs, rhs);
+    return knuth_sum(lhs, rhs);
   } else {
     return dekker_sum(lhs, rhs);
   }
@@ -359,7 +360,8 @@ void sparse_mult(span_l storage_left, span_r storage_right,
   }
 }
 
-template <std::floating_point eval_type>
+template <arith_number eval_type>
+requires (!vector_type<eval_type>)
 constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
                                                      const eval_type &rhs) {
   if (std::abs(lhs) >= std::abs(rhs)) {
@@ -386,7 +388,7 @@ dekker_sum_unchecked(const eval_type &lhs, const eval_type &rhs) {
   return {upper, rhs - rounding_err};
 }
 
-template <std::floating_point eval_type>
+template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
                                                     const eval_type &rhs) {
   const eval_type upper = lhs + rhs;

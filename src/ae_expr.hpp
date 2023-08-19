@@ -41,7 +41,6 @@ private:
 class additive_id {
 public:
   template <typename T>
-    requires std::signed_integral<T> || std::floating_point<T>
   operator T() const noexcept {
     return T{0};
   }
