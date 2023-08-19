@@ -5,6 +5,8 @@
 
 #include <fmt/format.h>
 
+#include <simd_vec/vectorclass.h>
+
 #include "ae_adaptive_predicate_eval.hpp"
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
@@ -14,6 +16,13 @@
 
 using namespace adaptive_expr;
 using namespace _impl;
+
+static_assert(arith_number<int>);
+static_assert(arith_number<long long>);
+static_assert(arith_number<unsigned int>);
+static_assert(arith_number<unsigned long long>);
+static_assert(arith_number<real>);
+static_assert(arith_number<Vec4f>);
 
 static_assert(is_expr_v<arith_expr<std::plus<>, real, real>>);
 static_assert(is_expr_v<const arith_expr<std::plus<>, real, real>>);
@@ -271,6 +280,31 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
     CHECK(check_sign(expected, exactfp_eval<real>(e)));
   }
 }
+
+#ifdef __cpp_lib_ranges_slide
+TEST_CASE("exact_eval_simd", "[simd_exact_eval_functor]") {
+  constexpr std::size_t vec_size = 4;
+  constexpr std::size_t x = 0;
+  constexpr std::size_t y = 1;
+  for (auto window : orient2d_cases | std::views::slide(vec_size)) {
+    std::array<std::array<Vec4f, 2>, 3> points;
+    Vec4f expected;
+    for (size_t i = 0; i < vec_size; ++i) {
+      for (size_t j = 0; j < points.size(); ++j) {
+        points[j][x].insert(i, window[i].first[j][x]);
+        points[j][y].insert(i, window[i].first[j][y]);
+      }
+      expected.insert(i, window[i].second);
+    }
+    const auto e = build_orient2d_case(points);
+    const Vec4f result = exactfp_eval<Vec4f>(e);
+    for (size_t i = 0; i < vec_size; ++i) {
+      fmt::print("{} vs {}\n", expected[i], result[i]);
+      CHECK(check_sign(expected[i], result[i]));
+    }
+  }
+}
+#endif
 
 // adaptive relative error bounds
 static_assert(max_rel_error<real, decltype(additive_id{})>() == 0);

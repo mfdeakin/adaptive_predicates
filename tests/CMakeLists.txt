@@ -17,7 +17,7 @@ endif()
 
 add_executable(tests test_adaptive_expr.cpp)
 target_link_libraries(tests PRIVATE adaptive_predicates shewchuk Catch2::Catch2WithMain)
-target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/extern)
+target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/extern ${CMAKE_SOURCE_DIR}/extern/simd_vec)
 
 # CGAL adds -frounding-math for GCC, but that breaks our tests,
 # wheras CGAL is only required for performance comparison
@@ -34,7 +34,7 @@ catch_discover_tests(test_matrix)
 
 add_executable(test_benchmarks test_benchmarks.cpp)
 target_link_libraries(test_benchmarks PRIVATE adaptive_predicates shewchuk Catch2::Catch2WithMain CGAL::CGAL)
-target_include_directories(test_benchmarks PRIVATE ${CMAKE_SOURCE_DIR}/extern)
+target_include_directories(test_benchmarks PRIVATE ${CMAKE_SOURCE_DIR}/extern ${CMAKE_SOURCE_DIR}/extern/simd_vec)
 catch_discover_tests(test_benchmarks)
 
 add_executable(perf_benchmark perf_benchmark.cpp)

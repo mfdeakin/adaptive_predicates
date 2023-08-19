@@ -2,6 +2,7 @@
 #ifndef ADAPTIVE_PREDICATES_AE_EXPR_HPP
 #define ADAPTIVE_PREDICATES_AE_EXPR_HPP
 
+#include <cmath>
 #include <compare>
 #include <functional>
 #include <type_traits>
@@ -66,8 +67,38 @@ concept negate_expr_type =
     std::is_same_v<typename E::LHS, additive_id>;
 
 template <typename T>
-concept arith_number = std::signed_integral<std::remove_cvref_t<T>> ||
-                       std::floating_point<std::remove_cvref_t<T>>;
+  requires std::floating_point<T> || std::integral<T>
+T mul_add(const T a, const T b, const T c) {
+  return std::fma(a, b, c);
+}
+
+template <std::signed_integral T> T abs(const T a) { return std::abs(a); }
+template <std::floating_point T> T abs(const T a) { return std::abs(a); }
+template <std::unsigned_integral T> T abs(const T a) { return a; }
+
+template <typename T>
+concept arith_number = !expr_type<T> && requires {
+  std::remove_cvref_t<T>{std::remove_cvref_t<T>{} + std::remove_cvref_t<T>{}};
+  std::remove_cvref_t<T>{std::remove_cvref_t<T>{} - std::remove_cvref_t<T>{}};
+  std::remove_cvref_t<T>{std::remove_cvref_t<T>{} * std::remove_cvref_t<T>{}};
+
+  std::remove_cvref_t<T>{} >= std::remove_cvref_t<T>{};
+
+  std::remove_cvref_t<T>{abs(std::remove_cvref_t<T>{})};
+  std::remove_cvref_t<T>{mul_add(std::remove_cvref_t<T>{},
+                                 std::remove_cvref_t<T>{},
+                                 std::remove_cvref_t<T>{})};
+};
+
+template <typename T>
+concept vector_type = arith_number<T> && requires {
+  // vectors are indexable and have a 3 parameter select function which chooses
+  // elements from the second element when the corresponding element in the
+  // first element is true
+  std::remove_cvref_t<T>{}[0];
+  select(std::remove_cvref_t<T>{} >= std::remove_cvref_t<T>{},
+         std::remove_cvref_t<T>{}, std::remove_cvref_t<T>{});
+};
 
 template <typename E>
 concept evaluatable = expr_type<E> || arith_number<E>;

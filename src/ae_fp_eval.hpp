@@ -29,7 +29,7 @@ constexpr eval_type fp_eval(E_ &&e) noexcept {
   }
 }
 
-template <std::floating_point eval_type, typename E>
+template <arith_number eval_type, typename E>
   requires expr_type<E> || arith_number<E>
 constexpr eval_type exactfp_eval(E &&e) noexcept {
   if constexpr (is_expr_v<std::remove_reference_t<E>>) {

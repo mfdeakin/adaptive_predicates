@@ -1,0 +1,3 @@
+[submodule "extern/simd_vec"]
+	path = extern/simd_vec
+	url = https://github.com/vectorclass/version2.git

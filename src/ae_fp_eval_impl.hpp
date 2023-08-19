@@ -37,7 +37,11 @@ auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage) ->
 
 auto merge_sum(std::ranges::range auto storage) ->
     typename decltype(storage)::value_type {
-  return merge_sum_quadratic_keep_zeros(storage);
+  if constexpr (vector_type<typename decltype(storage)::value_type>) {
+    return merge_sum_quadratic_keep_zeros(storage);
+  } else {
+    return merge_sum_quadratic(storage);
+  }
 }
 
 template <std::ranges::range span_l, std::ranges::range span_r,
@@ -51,20 +55,25 @@ constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
 template <std::floating_point eval_type>
 constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
                                                      const eval_type &rhs);
-template <std::floating_point eval_type>
-constexpr std::pair<eval_type, eval_type> dekker_sum2(const eval_type &lhs,
-                                                      const eval_type &rhs);
-template <std::floating_point eval_type>
+template <vector_type eval_type>
+constexpr std::pair<eval_type, eval_type>
+dekker_sum_vector(const eval_type &lhs, const eval_type &rhs);
+template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type>
 dekker_sum_unchecked(const eval_type &lhs, const eval_type &rhs);
 
-template <std::floating_point eval_type>
+template <typename eval_type>
+  requires std::floating_point<eval_type> || vector_type<eval_type>
 constexpr std::pair<eval_type, eval_type> two_sum(const eval_type &lhs,
                                                   const eval_type &rhs) {
-  return dekker_sum(lhs, rhs);
+  if constexpr (vector_type<eval_type>) {
+    return dekker_sum_vector(lhs, rhs);
+  } else {
+    return dekker_sum(lhs, rhs);
+  }
 }
 
-template <std::floating_point eval_type>
+template <arith_number eval_type>
 std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
                                            const eval_type &rhs);
 
@@ -139,7 +148,7 @@ constexpr auto error_overshoot(const arith_number auto result,
   return max_abs_err - std::abs(result);
 }
 
-template <std::floating_point eval_type, typename E_, std::ranges::range span_t>
+template <arith_number eval_type, typename E_, std::ranges::range span_t>
   requires expr_type<E_> || arith_number<E_>
 constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
   using E = std::remove_cvref_t<E_>;
@@ -295,7 +304,6 @@ auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
 
 auto merge_sum_append_keep_zeros(auto begin, auto end) {
   auto v = *end;
-  using eval_type = decltype(v);
   for (auto &e : std::span{begin, end}) {
     const auto [result, error] = two_sum(v, e);
     e = error;
@@ -356,17 +364,16 @@ constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
   }
 }
 
-template <std::floating_point eval_type>
-constexpr std::pair<eval_type, eval_type> dekker_sum2(const eval_type &lhs,
-                                                      const eval_type &rhs) {
-  if ((lhs > rhs) == (lhs > -rhs)) {
-    return dekker_sum_unchecked(lhs, rhs);
-  } else {
-    return dekker_sum_unchecked(rhs, lhs);
-  }
+template <vector_type eval_type>
+constexpr std::pair<eval_type, eval_type>
+dekker_sum_vector(const eval_type &lhs, const eval_type &rhs) {
+  const auto swaps = abs(lhs) >= abs(rhs);
+  const eval_type newLeft = select(swaps, lhs, rhs);
+  const eval_type newRight = select(!swaps, lhs, rhs);
+  return dekker_sum_unchecked(newLeft, newRight);
 }
 
-template <std::floating_point eval_type>
+template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type>
 dekker_sum_unchecked(const eval_type &lhs, const eval_type &rhs) {
   const eval_type upper = lhs + rhs;
@@ -385,11 +392,11 @@ constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
   return {upper, lhs_roundoff + rhs_roundoff};
 }
 
-template <std::floating_point eval_type>
+template <arith_number eval_type>
 std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
                                            const eval_type &rhs) {
   eval_type big = lhs * rhs;
-  return {big, std::fma(lhs, rhs, -big)};
+  return {big, mul_add(lhs, rhs, -big)};
 }
 
 } // namespace _impl
