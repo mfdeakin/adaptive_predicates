@@ -281,7 +281,7 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
   }
 }
 
-#ifdef __cpp_lib_ranges_slide
+#if defined(__cpp_lib_ranges_slide) && defined(__FMA__)
 TEST_CASE("exact_eval_simd", "[simd_exact_eval_functor]") {
   constexpr std::size_t vec_size = 4;
   constexpr std::size_t x = 0;
@@ -303,7 +303,7 @@ TEST_CASE("exact_eval_simd", "[simd_exact_eval_functor]") {
     }
   }
 }
-#endif
+#endif // defined(__cpp_lib_ranges_slide) && defined(__FMA__)
 
 // adaptive relative error bounds
 static_assert(max_rel_error<real, decltype(additive_id{})>() == 0);

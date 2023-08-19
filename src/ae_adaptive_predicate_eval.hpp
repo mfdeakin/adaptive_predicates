@@ -20,7 +20,7 @@ class adaptive_eval_impl;
 } // namespace _impl
 
 template <arith_number eval_type, typename E>
-  requires expr_type<E> || arith_number<E>
+  requires(expr_type<E> || arith_number<E>) && (!vector_type<eval_type>)
 eval_type adaptive_eval(E &&expr) {
   if constexpr (arith_number<E>) {
     return expr;

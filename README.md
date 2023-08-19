@@ -14,8 +14,8 @@ if(!evaluatable) {
 ```
 There are 3 primary eval_methods:
 * `correct_eval`: Returns an `std::optional` after evaluating with the specified floating point type if the result is guaranteed to have the correct sign based on relative error analysis. This computes relative error filters at compile-time, and if the maximum relative error ever exceeds 1, it returns nullopt. In the testing benchmarks this is about 3x slower than a basic floating point evaluation.
-* `adaptive_eval`: Returns a value with the correct sign, but not necessarily a good representative of the exact result. Currently very slow, but potentially much faster than exact evaluation.
-* `exact_eval`: Computes the result exactly, and then rounds it to the specified output format. The slowest method after adaptive_eval is improved
+* `adaptive_eval`: Returns a value with the correct sign, but not necessarily a good representative of the exact result. For latency sensitive applications, use this.
+* `exact_eval`: Computes the result exactly, and then rounds it to the specified output format. This is very slow, however, unlike adaptive_eval, it supports running on SIMD types that satisfy the `vector_type` concept. For high throughput applications, use this on expressions after determining they need exact evaluation.
 
 The `arith_expr` class represents the expression template as a binary tree; it takes 3 template parameters:
 * `Op`: A functor representing the arithmetic expression to be applied; generally one of `std::plus`, `std::minus`, or `std::multiplies`
@@ -34,4 +34,4 @@ For example, (30.0 + 2.0) * (10.0 + 0.5) = (30.0 * 10.0 + 30.0 * 0.5 + 2.0 * 10.
 which might expand to (300.0 + 10.0 + 5.0 + 20.0 + 1.0)
 Division can't currently be computed exactly; but todo in the future, it will be handled by rewriting the expression in terms of multiplications.
 
-This method is only performant for small expressions; for larger expressions, implementations using arbitrary precision floats like MPFR will be faster due to asymptotic complexity of multiplication
+This method is only performant for small expressions; for larger expressions, implementations using arbitrary precision floats like MPFR will be faster due to asymptotic complexity of multiplication (though supporting the full range of doubles may be challenging)
