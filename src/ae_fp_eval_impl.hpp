@@ -331,6 +331,11 @@ template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_m>
 void sparse_mult(span_l storage_left, span_r storage_right,
                  span_m storage_mult) {
+#ifndef __FMA__
+  static_assert(!vector_type<typename span_l::value_type>,
+                "Vectorization doesn't have a functional mul_sub method, "
+                "cannot efficiently evaluate multiplications exactly");
+#endif // __FMA__
   // This performs multiplication in-place for a contiguous piece of memory
   // starting at storage_left.begin() and ending at storage_mult.end()
   //

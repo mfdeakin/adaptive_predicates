@@ -90,7 +90,6 @@ concept arith_number = !expr_type<T> && requires {
                                  std::remove_cvref_t<T>{})};
 };
 
-#ifdef __FMA__
 template <typename T>
 concept vector_type = arith_number<T> && requires {
   // vectors are indexable and have a 3 parameter select function which chooses
@@ -101,13 +100,6 @@ concept vector_type = arith_number<T> && requires {
   select(std::remove_cvref_t<T>{} >= std::remove_cvref_t<T>{},
          std::remove_cvref_t<T>{}, std::remove_cvref_t<T>{});
 };
-#else
-template <typename T>
-concept vector_type = arith_number<T> && requires {
-  // vectors only work on CPUs with avx2 or higher
-  no_mul_sub_available(T{}, T{}, T{});
-};
-#endif
 
 template <typename E>
 concept evaluatable = expr_type<E> || arith_number<E>;

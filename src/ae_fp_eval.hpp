@@ -59,7 +59,7 @@ constexpr eval_type exactfp_eval(E &&e) noexcept {
 // need to be evaluated more accurately can be aggregated into a separate
 // collection; small expressions will likely use the same code-paths
 template <std::floating_point eval_type, typename E_>
-  requires expr_type<E_> || arith_number<E_>
+  requires (expr_type<E_> || arith_number<E_>) && (!vector_type<E_>)
 constexpr std::optional<eval_type> correct_eval(E_ &&e) noexcept {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr_v<E>) {
