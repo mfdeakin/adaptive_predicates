@@ -39,8 +39,7 @@ constexpr eval_type exactfp_eval(E &&e) noexcept {
       if constexpr (storage_needed > max_stack_storage) {
         return std::vector<eval_type>(storage_needed);
       } else {
-        auto arr = std::array<eval_type, storage_needed>{};
-        return arr;
+        return std::array<eval_type, storage_needed>{};
       }
     }();
     std::span<eval_type, num_partials_for_exact<E>()> partial_span{

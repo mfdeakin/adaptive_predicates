@@ -68,8 +68,8 @@ concept negate_expr_type =
 
 template <typename T>
   requires std::floating_point<T> || std::integral<T>
-T mul_add(const T a, const T b, const T c) {
-  return std::fma(a, b, c);
+T mul_sub(const T a, const T b, const T c) {
+  return std::fma(a, b, -c);
 }
 
 template <std::signed_integral T> T abs(const T a) { return std::abs(a); }
@@ -85,7 +85,7 @@ concept arith_number = !expr_type<T> && requires {
   std::remove_cvref_t<T>{} >= std::remove_cvref_t<T>{};
 
   std::remove_cvref_t<T>{abs(std::remove_cvref_t<T>{})};
-  std::remove_cvref_t<T>{mul_add(std::remove_cvref_t<T>{},
+  std::remove_cvref_t<T>{mul_sub(std::remove_cvref_t<T>{},
                                  std::remove_cvref_t<T>{},
                                  std::remove_cvref_t<T>{})};
 };
@@ -96,6 +96,7 @@ concept vector_type = arith_number<T> && requires {
   // elements from the second element when the corresponding element in the
   // first element is true
   std::remove_cvref_t<T>{}[0];
+  std::remove_cvref_t<T>{}.size();
   select(std::remove_cvref_t<T>{} >= std::remove_cvref_t<T>{},
          std::remove_cvref_t<T>{}, std::remove_cvref_t<T>{});
 };

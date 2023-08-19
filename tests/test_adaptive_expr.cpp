@@ -299,7 +299,6 @@ TEST_CASE("exact_eval_simd", "[simd_exact_eval_functor]") {
     const auto e = build_orient2d_case(points);
     const Vec4d result = exactfp_eval<Vec4d>(e);
     for (size_t i = 0; i < vec_size; ++i) {
-      fmt::print("{} vs {}\n", expected[i], result[i]);
       CHECK(check_sign(expected[i], result[i]));
     }
   }

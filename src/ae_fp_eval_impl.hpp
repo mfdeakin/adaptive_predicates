@@ -396,7 +396,7 @@ template <arith_number eval_type>
 std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
                                            const eval_type &rhs) {
   eval_type big = lhs * rhs;
-  return {big, mul_add(lhs, rhs, -big)};
+  return {big, mul_sub(lhs, rhs, big)};
 }
 
 } // namespace _impl
