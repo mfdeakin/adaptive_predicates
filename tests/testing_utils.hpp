@@ -4,9 +4,13 @@
 
 #include <cmath>
 
+#include <simd_vec/vectorclass.h>
+
 #include "ae_adaptive_predicate_eval.hpp"
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
+
+constexpr std::size_t vec_size = 4;
 
 #if __cpp_lib_mdspan >= 202207L
 #include <mdspan>
@@ -45,6 +49,21 @@ build_orient2d_case(const std::array<std::array<eval_type, 2>, 3> &points) {
            adaptive_expr::mult_expr(lhs[y], rhs[x]);
   };
   return cross_expr(v1, v2);
+}
+
+constexpr auto build_orient2d_vec_case(std::ranges::range auto window) {
+  constexpr std::size_t x = 0;
+  constexpr std::size_t y = 1;
+  std::array<std::array<Vec4d, 2>, 3> points;
+  Vec4d expected;
+  for (size_t i = 0; i < vec_size; ++i) {
+    for (size_t j = 0; j < points.size(); ++j) {
+      points[j][x].insert(i, window[i].first[j][x]);
+      points[j][y].insert(i, window[i].first[j][y]);
+    }
+    expected.insert(i, window[i].second);
+  }
+  return std::pair{build_orient2d_case(points), expected};
 }
 
 template <adaptive_expr::arith_number eval_type>

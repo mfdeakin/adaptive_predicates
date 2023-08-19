@@ -5,8 +5,6 @@
 
 #include <fmt/format.h>
 
-#include <simd_vec/vectorclass.h>
-
 #include "ae_adaptive_predicate_eval.hpp"
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
@@ -283,20 +281,8 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
 
 #if defined(__cpp_lib_ranges_slide) && defined(__FMA__)
 TEST_CASE("exact_eval_simd", "[simd_exact_eval_functor]") {
-  constexpr std::size_t vec_size = 4;
-  constexpr std::size_t x = 0;
-  constexpr std::size_t y = 1;
   for (auto window : orient2d_cases | std::views::slide(vec_size)) {
-    std::array<std::array<Vec4d, 2>, 3> points;
-    Vec4d expected;
-    for (size_t i = 0; i < vec_size; ++i) {
-      for (size_t j = 0; j < points.size(); ++j) {
-        points[j][x].insert(i, window[i].first[j][x]);
-        points[j][y].insert(i, window[i].first[j][y]);
-      }
-      expected.insert(i, window[i].second);
-    }
-    const auto e = build_orient2d_case(points);
+    const auto [e, expected] = build_orient2d_vec_case(window);
     const Vec4d result = exactfp_eval<Vec4d>(e);
     for (size_t i = 0; i < vec_size; ++i) {
       CHECK(check_sign(expected[i], result[i]));

@@ -199,4 +199,16 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   BENCHMARK("cgal exact rounded 4") {
     return CGAL::orientation(pt0, pt1, pt2);
   };
+
+  const std::array points_arr{
+      std::pair{points1, real{0}}, std::pair{points2, real{0}},
+      std::pair{points3, real{0}}, std::pair{points4, real{0}}};
+  BENCHMARK("floating point vector eval") {
+    const auto [e, _] = build_orient2d_vec_case(points_arr);
+    return fp_eval<Vec4d>(e);
+  };
+  BENCHMARK("exact vector eval") {
+    const auto [e, _] = build_orient2d_vec_case(points_arr);
+    return exactfp_eval<Vec4d>(e);
+  };
 }
