@@ -287,8 +287,8 @@ TEST_CASE("exact_eval_simd", "[simd_exact_eval_functor]") {
   constexpr std::size_t x = 0;
   constexpr std::size_t y = 1;
   for (auto window : orient2d_cases | std::views::slide(vec_size)) {
-    std::array<std::array<Vec4f, 2>, 3> points;
-    Vec4f expected;
+    std::array<std::array<Vec4d, 2>, 3> points;
+    Vec4d expected;
     for (size_t i = 0; i < vec_size; ++i) {
       for (size_t j = 0; j < points.size(); ++j) {
         points[j][x].insert(i, window[i].first[j][x]);
@@ -297,7 +297,7 @@ TEST_CASE("exact_eval_simd", "[simd_exact_eval_functor]") {
       expected.insert(i, window[i].second);
     }
     const auto e = build_orient2d_case(points);
-    const Vec4f result = exactfp_eval<Vec4f>(e);
+    const Vec4d result = exactfp_eval<Vec4d>(e);
     for (size_t i = 0; i < vec_size; ++i) {
       fmt::print("{} vs {}\n", expected[i], result[i]);
       CHECK(check_sign(expected[i], result[i]));
