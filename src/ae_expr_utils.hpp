@@ -34,20 +34,6 @@ template <typename eval_type> eval_type lowest_order_exp(const eval_type v) {
 
 bool is_nonoverlapping(std::ranges::range auto vals) {
   using eval_type = typename decltype(vals)::value_type;
-#if __cpp_lib_ranges_zip > 202110L // std::ranges::views::adjacent implemented
-  const auto compared_pairs =
-      vals | std::ranges::views::transform([](const eval_type &v) {
-        return std::pair{lowest_order_exp(std::abs(v)), std::abs(v)};
-      }) |
-      std::ranges::views::adjacent<2> |
-      std::ranges::views::transform(
-          [](const std::pair<std::pair<eval_type, eval_type>,
-                             std::pair<eval_type, eval_type>> &cmp) {
-            return cmp.first.second < cmp.second.first;
-          });
-  return std::reduce(compared_pairs.begin(), compared_pairs.end(), true,
-                     std::logical_and<>());
-#else
   if (vals.size() == 0) {
     return true;
   }
@@ -63,7 +49,6 @@ bool is_nonoverlapping(std::ranges::range auto vals) {
     last = v;
   }
   return true;
-#endif
 }
 
 template <typename E> constexpr std::size_t num_ops(const E &&e) {
@@ -312,6 +297,21 @@ template <typename E_> consteval std::size_t num_partials_for_exact() {
   } else {
     return 1;
   }
+}
+
+template <typename E>
+  requires arith_number<E> || expr_type<E>
+consteval bool sign_guaranteed(E expr) {
+  if constexpr (depth(expr) <= 2) {
+    return true;
+  } else {
+    using Op = typename E::Op;
+    if (std::is_same_v<std::multiplies<>, Op> && sign_guaranteed(expr.lhs()) &&
+        sign_guaranteed(expr.rhs())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 template <typename Op> consteval std::size_t op_latency() {

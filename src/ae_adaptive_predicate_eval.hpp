@@ -22,8 +22,8 @@ class adaptive_eval_impl;
 template <arith_number eval_type, typename E>
   requires(expr_type<E> || arith_number<E>) && (!vector_type<eval_type>)
 eval_type adaptive_eval(E &&expr) {
-  if constexpr (arith_number<E>) {
-    return expr;
+  if constexpr (sign_guaranteed(std::remove_cvref_t<E>{})) {
+    return fp_eval<eval_type>(expr);
   } else {
     return _impl::adaptive_eval_impl<E, eval_type>().eval(expr);
   }
