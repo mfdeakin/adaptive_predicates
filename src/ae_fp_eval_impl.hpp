@@ -53,12 +53,15 @@ template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
                                                     const eval_type &rhs);
 template <arith_number eval_type>
-requires (!vector_type<eval_type>)
+  requires(!vector_type<eval_type>)
 constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
                                                      const eval_type &rhs);
 template <vector_type eval_type>
 constexpr std::pair<eval_type, eval_type>
-dekker_sum_vector(const eval_type &lhs, const eval_type &rhs);
+dekker_sum_vector_1(const eval_type &lhs, const eval_type &rhs);
+template <arith_number eval_type>
+constexpr std::pair<eval_type, eval_type>
+dekker_sum_vector_2(const eval_type &lhs, const eval_type &rhs);
 template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type>
 dekker_sum_unchecked(const eval_type &lhs, const eval_type &rhs);
@@ -361,7 +364,7 @@ void sparse_mult(span_l storage_left, span_r storage_right,
 }
 
 template <arith_number eval_type>
-requires (!vector_type<eval_type>)
+  requires(!vector_type<eval_type>)
 constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
                                                      const eval_type &rhs) {
   if (std::abs(lhs) >= std::abs(rhs)) {
@@ -373,10 +376,19 @@ constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
 
 template <vector_type eval_type>
 constexpr std::pair<eval_type, eval_type>
-dekker_sum_vector(const eval_type &lhs, const eval_type &rhs) {
+dekker_sum_vector_1(const eval_type &lhs, const eval_type &rhs) {
   const auto swaps = abs(lhs) >= abs(rhs);
   const eval_type newLeft = select(swaps, lhs, rhs);
   const eval_type newRight = select(!swaps, lhs, rhs);
+  return dekker_sum_unchecked(newLeft, newRight);
+}
+
+template <arith_number eval_type>
+constexpr std::pair<eval_type, eval_type>
+dekker_sum_vector_2(const eval_type &lhs, const eval_type &rhs) {
+  const auto swaps = abs(lhs) >= abs(rhs);
+  const eval_type newLeft = (eval_type{0} + swaps) * lhs + (eval_type{1} - swaps) * rhs;
+  const eval_type newRight = (eval_type{1} - swaps) * lhs + (eval_type{0} + swaps) * rhs;
   return dekker_sum_unchecked(newLeft, newRight);
 }
 
