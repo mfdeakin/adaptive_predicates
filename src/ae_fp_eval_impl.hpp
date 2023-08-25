@@ -152,6 +152,17 @@ constexpr auto error_overshoot(const arith_number auto result,
   return max_abs_err - std::abs(result);
 }
 
+constexpr bool error_overlaps(const arith_number auto left_result,
+                              const arith_number auto left_abs_err,
+                              const arith_number auto right_result,
+                              const arith_number auto right_abs_err) {
+  if ((left_result - left_abs_err) > (right_result - right_abs_err)) {
+    return error_overlaps(right_result, right_abs_err, left_result,
+                          left_abs_err);
+  }
+  return (right_result - right_abs_err) < (left_result + left_abs_err);
+}
+
 template <arith_number eval_type, typename E_, std::ranges::range span_t>
   requires expr_type<E_> || arith_number<E_>
 constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {

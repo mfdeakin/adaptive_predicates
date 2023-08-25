@@ -197,11 +197,32 @@ private:
       // Multiplication doesn't affect the final sign, so don't exactly evaluate
       // it unless the upper part of the expression requires it
       if constexpr (!std::is_same_v<std::multiplies<>, Op>) {
-        const eval_type overshoot = _impl::error_overshoot(result, max_abs_err);
-        if (overshoot > 0.0) {
-          return handle_overshoot<branch>(expr, result, left_result,
-                                          left_abs_err, right_result,
-                                          right_abs_err, max_abs_err);
+        // If we're adding values of the same sign, or subtracting opposing
+        // signs, the final sign is unaffected unless the relative error is too
+        // large. Do a cheap check first, then a slightly more expensive check
+        constexpr bool is_plus = std::is_same_v<std::plus<>, Op>;
+        constexpr bool is_minus = std::is_same_v<std::minus<>, Op>;
+        if (!((is_plus && same_sign_or_zero(left_result, right_result)) ||
+              (is_minus && same_sign_or_zero(left_result, -right_result)))) {
+          // We need to mirror over zero one of the values being added and
+          // ensure that when mirrored, its possible range doesn't overlap the
+          // other values possible range
+          // This ensures that we aren't subtracting values which might have too
+          // similar magnitude.
+          if ((is_plus &&
+               _impl::error_overlaps(left_result, left_abs_err, -right_result,
+                                     right_abs_err)) ||
+              (is_minus &&
+               _impl::error_overlaps(left_result, left_abs_err, right_result,
+                                     right_abs_err))) {
+            const eval_type overshoot =
+                _impl::error_overshoot(result, max_abs_err);
+            if (overshoot > 0.0) {
+              return handle_overshoot<branch>(expr, result, left_result,
+                                              left_abs_err, right_result,
+                                              right_abs_err, max_abs_err);
+            }
+          }
         }
       }
       return {result, max_abs_err};

@@ -18,6 +18,16 @@ concept comparison_op = std::is_same_v<std::less<>, Op> ||
 template <typename E>
 concept predicate = expr_type<E> && comparison_op<typename E::Op>;
 
+constexpr bool same_sign_or_zero(arith_number auto a, arith_number auto b) {
+  if (a > 0) {
+    return b >= 0;
+  } else if (a < 0) {
+    return b <= 0;
+  } else {
+    return true;
+  }
+}
+
 template <typename eval_type> eval_type lowest_order_exp(const eval_type v) {
   if (v == eval_type{0}) {
     return 0;
