@@ -1,4 +1,4 @@
-An implementation of exactly evaluated floating point predicates for arbitrary expressions composed of additions and multiplications
+An implementation of exactly evaluated floating point predicates for arbitrary expressions composed of additions and multiplications.
 
 This provides an expression template system for representing arbitrary expressions at compile-time,
 and eval functions for evaluating the expressions with various guarantees.
@@ -13,8 +13,8 @@ if(!evaluatable) {
 }
 ```
 There are 4 primary eval_methods:
-* `correct_eval`: Returns an `std::optional` after evaluating with the specified floating point type if the result is guaranteed to have the correct sign based on relative error analysis. This computes relative error filters at compile-time, and if the maximum relative error ever exceeds 1, it returns nullopt. In the testing benchmarks this is about 3x slower than a basic floating point evaluation. This does not work with vector operations, use `eval_with_err` instead.
-* `eval_with_err`: Returns a pair containing the approximate result and the estimated error if the result is guaranteed to have the correct sign based on relative error analysis. If not, then it returns NaN. This works with vector types with an associated `select` method. `eval_with_err` is currently somewhat better at filtering than `correct_eval`.
+* `correct_eval`: Returns an `std::optional` after evaluating with the specified floating point type if the result is guaranteed to have the correct sign based on relative error analysis. This computes relative error filters at compile-time, and if the maximum relative error ever exceeds 1, it returns nullopt. In the testing benchmarks this is about 3x slower than a basic floating point evaluation. This does not work with vector operations, use `eval_with_err` directly instead.
+* `eval_with_err`: Returns a pair containing the approximate result and the estimated error if the result is guaranteed to have the correct sign based on relative error analysis. If not, then it returns NaN. This works with vector types with an associated `select` method.
 * `adaptive_eval`: Returns a value with the correct sign, but not necessarily a good representative of the exact result. For latency sensitive applications, use this.
 * `exact_eval`: Computes the result exactly, and then rounds it to the specified output format. This is very slow, however, unlike adaptive_eval, it supports running on SIMD types that satisfy the `vector_type` concept. For high throughput applications, use this on expressions after determining they need exact evaluation.
 
@@ -30,9 +30,9 @@ This computes exactly by representing intermediate results as a finite series
 For example, 435.75 might be represented as (430.0 + 5.0 + 0.75), or as (195.0 - 200.0 + 195.0 + 200.75 - 55.0)
 Then, results are computed exactly by appending the necessary values to the series
 Addition and subtraction are straight-forward, they just append the operand to the series
-Multiplication computes the exact product of every pair in the two series being multiplied and creates a new series from the result
+Multiplication computes the exact product of every pair in the two series being multiplied and creates a new series from the result.
 For example, (30.0 + 2.0) * (10.0 + 0.5) = (30.0 * 10.0 + 30.0 * 0.5 + 2.0 * 10.0 + 2.0 * 0.5),
-which might expand to (300.0 + 10.0 + 5.0 + 20.0 + 1.0)
+which might expand to (300.0 + 10.0 + 5.0 + 20.0 + 1.0).
 Division can't currently be computed exactly; but todo in the future, it will be handled by rewriting the expression in terms of multiplications.
 
 This method is only performant for small expressions; for larger expressions, implementations using arbitrary precision floats like MPFR will be faster due to asymptotic complexity of multiplication (though supporting the full range of doubles may be challenging)

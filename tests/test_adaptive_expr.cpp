@@ -341,7 +341,9 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   const auto points = orient2d_cases[0].first;
   const auto expected = orient2d_cases[0].second;
   const auto expr = build_orient2d_case(points);
-  REQUIRE(!correct_eval<real>(expr));
+  REQUIRE(correct_eval<real>(expr));
+  REQUIRE(check_sign(*correct_eval<real>(expr), expected));
+  REQUIRE(!std::isnan(eval_with_err<real>(expr).first));
   REQUIRE(check_sign(eval_with_err<real>(expr).first, expected));
 }
 
