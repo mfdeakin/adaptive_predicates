@@ -128,10 +128,15 @@ error_contributions(const eval_type left, const eval_type left_abs_err,
                 std::is_same_v<Op, std::minus<>>) {
     return {left_abs_err, right_abs_err};
   } else if constexpr (std::is_same_v<Op, std::multiplies<>>) {
-    return {std::abs(right) * left_abs_err, std::abs(left) * right_abs_err};
+    return {abs(right) * left_abs_err, abs(left) * right_abs_err};
   } else {
-    return {std::numeric_limits<eval_type>::signaling_NaN(),
-            std::numeric_limits<eval_type>::signaling_NaN()};
+    if constexpr (!vector_type<eval_type>) {
+      return {std::numeric_limits<eval_type>::signaling_NaN(),
+              std::numeric_limits<eval_type>::signaling_NaN()};
+    } else {
+      return {eval_type{std::numeric_limits<double>::signaling_NaN()},
+              eval_type{std::numeric_limits<double>::signaling_NaN()}};
+    }
   }
 }
 
@@ -144,7 +149,7 @@ eval_with_max_abs_err(const eval_type left, const eval_type left_abs_err,
   const eval_type result = Op()(left, right);
   return {result,
           left_contrib + right_contrib +
-              std::abs(result) * std::numeric_limits<eval_type>::epsilon() / 2};
+              abs(result) * std::numeric_limits<eval_type>::epsilon() / 2};
 }
 
 constexpr auto error_overshoot(const arith_number auto result,
@@ -165,7 +170,7 @@ error_overlaps(const eval_type left_result, const eval_type left_abs_err,
 }
 
 template <vector_type eval_type>
-constexpr bool
+constexpr auto
 error_overlaps(const eval_type left_result, const eval_type left_abs_err,
                const eval_type right_result, const eval_type right_abs_err) {
   return (((left_result - left_abs_err) <= (right_result - right_abs_err)) &&

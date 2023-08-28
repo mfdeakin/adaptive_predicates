@@ -56,7 +56,7 @@ constexpr eval_type exactfp_eval(E &&e) noexcept {
 // Returns the approximate value and an upper bound on the absolute error
 // If the sign may be wrong, return a pair of NaNs
 template <arith_number eval_type, typename E_>
-  requires(expr_type<E_> || arith_number<E_>) && (!vector_type<E_>)
+  requires(expr_type<E_> || arith_number<E_>)
 constexpr std::pair<eval_type, eval_type> eval_with_err(E_ &&e) noexcept {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr_v<E>) {
@@ -67,7 +67,7 @@ constexpr std::pair<eval_type, eval_type> eval_with_err(E_ &&e) noexcept {
         left_result, left_abs_err, right_result, right_abs_err);
 
     if constexpr (!std::is_same_v<std::multiplies<>, Op>) {
-      constexpr eval_type nan{std::numeric_limits<double>::signaling_NaN()};
+      const eval_type nan{std::numeric_limits<double>::signaling_NaN()};
       if constexpr (std::is_same_v<std::minus<>, Op>) {
         right_result = -right_result;
       }

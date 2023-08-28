@@ -31,7 +31,7 @@ constexpr bool same_sign_or_zero(eval_type a, eval_type b) {
 }
 
 template <vector_type eval_type>
-constexpr bool same_sign_or_zero(eval_type a, eval_type b) {
+constexpr auto same_sign_or_zero(eval_type a, eval_type b) {
   return ((a > 0) && (b >= 0)) || ((a < 0) && (b <= 0)) || (a == 0);
 }
 

@@ -280,6 +280,16 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
 }
 
 #if defined(__cpp_lib_ranges_slide) && defined(__FMA__)
+TEST_CASE("eval_with_err_simd", "[simd_eval_with_err_functor]") {
+  for (auto window : orient2d_cases | std::views::slide(vec_size)) {
+    const auto [e, expected] = build_orient2d_vec_case(window);
+    const auto [result, _] = eval_with_err<Vec4d>(e);
+    for (size_t i = 0; i < vec_size; ++i) {
+      CHECK((std::isnan(result[i]) || check_sign(expected[i], result[i])));
+    }
+  }
+}
+
 TEST_CASE("exact_eval_simd", "[simd_exact_eval_functor]") {
   for (auto window : orient2d_cases | std::views::slide(vec_size)) {
     const auto [e, expected] = build_orient2d_vec_case(window);
