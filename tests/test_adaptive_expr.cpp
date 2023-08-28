@@ -330,8 +330,19 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   REQUIRE(*correct_eval<real>(e.lhs()) == -15.0);
   REQUIRE(*correct_eval<real>(e) == -14.5);
 
+  REQUIRE(!std::isnan(eval_with_err<real>(e).first));
+  REQUIRE(std::isnan(eval_with_err<real>(e + 14.5).first));
+  REQUIRE(eval_with_err<real>(e.lhs().lhs().lhs().lhs()).first == 0.0);
+  REQUIRE(eval_with_err<real>(e.lhs().lhs().lhs()).first == 4.0);
+  REQUIRE(eval_with_err<real>(e.lhs().lhs()).first == -3.0);
+  REQUIRE(eval_with_err<real>(e.lhs()).first == -15.0);
+  REQUIRE(eval_with_err<real>(e).first == -14.5);
+
   const auto points = orient2d_cases[0].first;
-  REQUIRE(!correct_eval<real>(build_orient2d_case(points)));
+  const auto expected = orient2d_cases[0].second;
+  const auto expr = build_orient2d_case(points);
+  REQUIRE(!correct_eval<real>(expr));
+  REQUIRE(check_sign(eval_with_err<real>(expr).first, expected));
 }
 
 TEST_CASE("nonoverlapping", "[eval_utils]") {

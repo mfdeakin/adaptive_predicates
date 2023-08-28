@@ -152,15 +152,26 @@ constexpr auto error_overshoot(const arith_number auto result,
   return max_abs_err - std::abs(result);
 }
 
-constexpr bool error_overlaps(const arith_number auto left_result,
-                              const arith_number auto left_abs_err,
-                              const arith_number auto right_result,
-                              const arith_number auto right_abs_err) {
+template <arith_number eval_type>
+  requires(!vector_type<eval_type>)
+constexpr bool
+error_overlaps(const eval_type left_result, const eval_type left_abs_err,
+               const eval_type right_result, const eval_type right_abs_err) {
   if ((left_result - left_abs_err) > (right_result - right_abs_err)) {
     return error_overlaps(right_result, right_abs_err, left_result,
                           left_abs_err);
   }
   return (right_result - right_abs_err) < (left_result + left_abs_err);
+}
+
+template <vector_type eval_type>
+constexpr bool
+error_overlaps(const eval_type left_result, const eval_type left_abs_err,
+               const eval_type right_result, const eval_type right_abs_err) {
+  return (((left_result - left_abs_err) <= (right_result - right_abs_err)) &&
+          ((right_result - right_abs_err) < (left_result + left_abs_err))) ||
+         (((left_result - left_abs_err) > (right_result - right_abs_err)) &&
+          ((right_result - right_abs_err) >= (left_result + left_abs_err)));
 }
 
 template <arith_number eval_type, typename E_, std::ranges::range span_t>
@@ -398,8 +409,10 @@ template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type>
 dekker_sum_vector_2(const eval_type &lhs, const eval_type &rhs) {
   const auto swaps = abs(lhs) >= abs(rhs);
-  const eval_type newLeft = (eval_type{0} + swaps) * lhs + (eval_type{1} - swaps) * rhs;
-  const eval_type newRight = (eval_type{1} - swaps) * lhs + (eval_type{0} + swaps) * rhs;
+  const eval_type newLeft =
+      (eval_type{0} + swaps) * lhs + (eval_type{1} - swaps) * rhs;
+  const eval_type newRight =
+      (eval_type{1} - swaps) * lhs + (eval_type{0} + swaps) * rhs;
   return dekker_sum_unchecked(newLeft, newRight);
 }
 

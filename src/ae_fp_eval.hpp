@@ -53,13 +53,51 @@ constexpr eval_type exactfp_eval(E &&e) noexcept {
   }
 }
 
+// Returns the approximate value and an upper bound on the absolute error
+// If the sign may be wrong, return a pair of NaNs
+template <arith_number eval_type, typename E_>
+  requires(expr_type<E_> || arith_number<E_>) && (!vector_type<E_>)
+constexpr std::pair<eval_type, eval_type> eval_with_err(E_ &&e) noexcept {
+  using E = std::remove_cvref_t<E_>;
+  if constexpr (is_expr_v<E>) {
+    const auto [left_result, left_abs_err] = eval_with_err<eval_type>(e.lhs());
+    auto [right_result, right_abs_err] = eval_with_err<eval_type>(e.rhs());
+    using Op = typename E::Op;
+    const auto [result, max_abs_err] = _impl::eval_with_max_abs_err<Op>(
+        left_result, left_abs_err, right_result, right_abs_err);
+
+    if constexpr (!std::is_same_v<std::multiplies<>, Op>) {
+      constexpr eval_type nan{std::numeric_limits<double>::signaling_NaN()};
+      if constexpr (std::is_same_v<std::minus<>, Op>) {
+        right_result = -right_result;
+      }
+      const auto selector = (!same_sign_or_zero(left_result, right_result)) &&
+                            _impl::error_overlaps(left_result, left_abs_err,
+                                                  -right_result, right_abs_err);
+      if constexpr (vector_type<eval_type>) {
+        return {select(selector, result, nan),
+                select(selector, max_abs_err, nan)};
+      } else {
+        if (selector) {
+          return {nan, nan};
+        } else {
+          return {result, max_abs_err};
+        }
+      }
+    }
+    return {result, max_abs_err};
+  } else {
+    return {e, eval_type{0}};
+  }
+}
+
 // correct_eval either returns the result with an accuracy bounded by
 // max_rel_error<E>, or it returns std::nullopt
 // This is intended to make it easier to effectively run on GPUs - results that
 // need to be evaluated more accurately can be aggregated into a separate
 // collection; small expressions will likely use the same code-paths
 template <arith_number eval_type, typename E_>
-  requires (expr_type<E_> || arith_number<E_>) && (!vector_type<E_>)
+  requires(expr_type<E_> || arith_number<E_>) && (!vector_type<E_>)
 constexpr std::optional<eval_type> correct_eval(E_ &&e) noexcept {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr_v<E>) {

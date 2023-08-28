@@ -18,7 +18,9 @@ concept comparison_op = std::is_same_v<std::less<>, Op> ||
 template <typename E>
 concept predicate = expr_type<E> && comparison_op<typename E::Op>;
 
-constexpr bool same_sign_or_zero(arith_number auto a, arith_number auto b) {
+template <arith_number eval_type>
+  requires(!vector_type<eval_type>)
+constexpr bool same_sign_or_zero(eval_type a, eval_type b) {
   if (a > 0) {
     return b >= 0;
   } else if (a < 0) {
@@ -28,7 +30,14 @@ constexpr bool same_sign_or_zero(arith_number auto a, arith_number auto b) {
   }
 }
 
-template <typename eval_type> eval_type lowest_order_exp(const eval_type v) {
+template <vector_type eval_type>
+constexpr bool same_sign_or_zero(eval_type a, eval_type b) {
+  return ((a > 0) && (b >= 0)) || ((a < 0) && (b <= 0)) || (a == 0);
+}
+
+template <typename eval_type>
+  requires(!vector_type<eval_type>)
+eval_type lowest_order_exp(const eval_type v) {
   if (v == eval_type{0}) {
     return 0;
   } else {
@@ -42,8 +51,10 @@ template <typename eval_type> eval_type lowest_order_exp(const eval_type v) {
   }
 }
 
-bool is_nonoverlapping(std::ranges::range auto vals) {
-  using eval_type = typename decltype(vals)::value_type;
+template <std::ranges::range range_t>
+  requires(!vector_type<typename range_t::value_type>)
+bool is_nonoverlapping(range_t vals) {
+  using eval_type = typename range_t::value_type;
   if (vals.size() == 0) {
     return true;
   }
