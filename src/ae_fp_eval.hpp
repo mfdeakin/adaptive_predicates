@@ -66,7 +66,7 @@ constexpr std::pair<eval_type, eval_type> eval_with_err(E_ &&e) noexcept {
     const auto [result, max_abs_err] = _impl::eval_with_max_abs_err<Op>(
         left_result, left_abs_err, right_result, right_abs_err);
 
-    if constexpr (!std::is_same_v<std::multiplies<>, Op>) {
+    if constexpr (!std::is_same_v<std::multiplies<>, Op> && depth(E{}) > 2) {
       const eval_type nan{std::numeric_limits<double>::signaling_NaN()};
       if constexpr (std::is_same_v<std::minus<>, Op>) {
         right_result = -right_result;

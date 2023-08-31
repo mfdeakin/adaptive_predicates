@@ -196,7 +196,7 @@ private:
 
       // Multiplication doesn't affect the final sign, so don't exactly evaluate
       // it unless the upper part of the expression requires it
-      if constexpr (!std::is_same_v<std::multiplies<>, Op>) {
+      if constexpr (!std::is_same_v<std::multiplies<>, Op> && depth(sub_expr{}) > 2) {
         // If we're adding values of the same sign, or subtracting opposing
         // signs, the final sign is unaffected unless the relative error is too
         // large. Do a cheap check first, then a slightly more expensive check
