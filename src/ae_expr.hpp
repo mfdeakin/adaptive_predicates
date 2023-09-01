@@ -167,42 +167,6 @@ constexpr auto operator/(LHS &&lhs, RHS &&rhs) {
   return divide_expr(std::forward<LHS>(lhs), std::forward<RHS>(rhs));
 }
 
-template <typename LHS, typename RHS>
-  requires arith_expr_operands<LHS, RHS>
-constexpr auto operator<(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::less<>, std::remove_cvref_t<LHS>,
-                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
-                                              std::forward<RHS>(rhs));
-}
-
-template <typename LHS, typename RHS>
-  requires arith_expr_operands<LHS, RHS>
-constexpr auto operator>(LHS &&lhs, RHS &&rhs) {
-  return std::forward<RHS>(rhs) < std::forward<LHS>(lhs);
-}
-
-template <typename LHS, typename RHS>
-  requires arith_expr_operands<LHS, RHS>
-constexpr auto operator<=(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::less_equal<>, std::remove_cvref_t<LHS>,
-                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
-                                              std::forward<RHS>(rhs));
-}
-
-template <typename LHS, typename RHS>
-  requires arith_expr_operands<LHS, RHS>
-constexpr auto operator>=(LHS &&lhs, RHS &&rhs) {
-  return std::forward<RHS>(rhs) <= std::forward<LHS>(lhs);
-}
-
-template <typename LHS, typename RHS>
-  requires arith_expr_operands<LHS, RHS>
-constexpr auto operator==(LHS &&lhs, RHS &&rhs) {
-  return arith_expr<std::equal_to<>, std::remove_cvref_t<LHS>,
-                    std::remove_cvref_t<RHS>>(std::forward<LHS>(lhs),
-                                              std::forward<RHS>(rhs));
-}
-
 } // namespace adaptive_expr
 
 #endif // ADAPTIVE_PREDICATES_AE_EXPR_HPP

@@ -70,11 +70,6 @@ TEST_CASE("expr_template_construction", "[expr_template]") {
   CHECK_THROWS_AS(E{} - E{}, constructor_test::move_ex);
   CHECK_THROWS_AS(E{} * E{}, constructor_test::move_ex);
   CHECK_THROWS_AS(E{} / E{}, constructor_test::move_ex);
-  CHECK_THROWS_AS(E{} < E{}, constructor_test::move_ex);
-  CHECK_THROWS_AS(E{} <= E{}, constructor_test::move_ex);
-  CHECK_THROWS_AS(E{} == E{}, constructor_test::move_ex);
-  CHECK_THROWS_AS(E{} > E{}, constructor_test::move_ex);
-  CHECK_THROWS_AS(E{} >= E{}, constructor_test::move_ex);
 
   REQUIRE_NOTHROW(E{});
   E e1;
@@ -83,11 +78,6 @@ TEST_CASE("expr_template_construction", "[expr_template]") {
   CHECK_THROWS_AS(e1 - e2, constructor_test::copy_ref_ex);
   CHECK_THROWS_AS(e1 * e2, constructor_test::copy_ref_ex);
   CHECK_THROWS_AS(e1 / e2, constructor_test::copy_ref_ex);
-  CHECK_THROWS_AS(e1 < e2, constructor_test::copy_ref_ex);
-  CHECK_THROWS_AS(e1 <= e2, constructor_test::copy_ref_ex);
-  CHECK_THROWS_AS(e1 == e2, constructor_test::copy_ref_ex);
-  CHECK_THROWS_AS(e1 > e2, constructor_test::copy_ref_ex);
-  CHECK_THROWS_AS(e1 >= e2, constructor_test::copy_ref_ex);
 }
 
 // expression rewriting
