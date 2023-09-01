@@ -80,7 +80,7 @@ constexpr std::pair<eval_type, eval_type> eval_with_err(E_ &&e) noexcept {
       } else {
         if (selector) {
           return {nan, nan};
-        } else {
+        } else [[likely]] {
           return {result, max_abs_err};
         }
       }
@@ -129,7 +129,7 @@ constexpr auto eval_checked_fast(E_ &&e) noexcept {
         if (signs_match ||
             (no_lower_subtract &&
              (abs(result) > abs(left_result - right_result) *
-                                _impl::max_rel_error<eval_type, E>()))) {
+                                _impl::max_rel_error<eval_type, E>()))) [[likely]] {
           return std::pair{result, no_lower_subtract && signs_match};
         } else {
           return std::pair{nan, bool_type{false}};
@@ -155,10 +155,10 @@ constexpr std::optional<eval_type> correct_eval(E &&e) noexcept {
     const auto [new_result, _] = eval_with_err<eval_type>(std::forward<E>(e));
     if (std::isnan(new_result)) {
       return std::nullopt;
-    } else {
+    } else [[likely]] {
       return new_result;
     }
-  } else {
+  } else [[likely]] {
     return result;
   }
 }

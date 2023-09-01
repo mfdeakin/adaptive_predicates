@@ -32,7 +32,7 @@ eval_type adaptive_eval(E &&expr) {
     auto [checked_result, _] = eval_checked_fast<eval_type>(expr);
     if (std::isnan(checked_result)) {
       return _impl::adaptive_eval_impl<E, eval_type>().eval(expr);
-    } else {
+    } else [[likely]] {
       return checked_result;
     }
   }
@@ -213,7 +213,8 @@ private:
         constexpr bool is_plus = std::is_same_v<std::plus<>, Op>;
         constexpr bool is_minus = std::is_same_v<std::minus<>, Op>;
         if (!((is_plus && same_sign_or_zero(left_result, right_result)) ||
-              (is_minus && same_sign_or_zero(left_result, -right_result)))) {
+              (is_minus && same_sign_or_zero(left_result, -right_result))))
+            [[unlikely]] {
           // We need to mirror over zero one of the values being added and
           // ensure that when mirrored, its possible range doesn't overlap the
           // other values possible range
@@ -222,9 +223,9 @@ private:
           if ((is_plus &&
                _impl::error_overlaps(left_result, left_abs_err, -right_result,
                                      right_abs_err)) ||
-              (is_minus &&
-               _impl::error_overlaps(left_result, left_abs_err, right_result,
-                                     right_abs_err))) {
+              (is_minus && _impl::error_overlaps(left_result, left_abs_err,
+                                                 right_result, right_abs_err)))
+              [[unlikely]] {
             const eval_type overshoot =
                 _impl::error_overshoot(result, max_abs_err);
             if (overshoot > 0.0) {
