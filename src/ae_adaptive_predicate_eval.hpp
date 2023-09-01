@@ -22,10 +22,19 @@ class adaptive_eval_impl;
 template <arith_number eval_type, typename E>
   requires(expr_type<E> || arith_number<E>) && (!vector_type<eval_type>)
 eval_type adaptive_eval(E &&expr) {
-  if constexpr (sign_guaranteed(std::remove_cvref_t<E>{})) {
+  using E_nr = std::remove_cvref_t<E>;
+  if constexpr (sign_guaranteed(E_nr{})) {
     return fp_eval<eval_type>(expr);
+  } else if constexpr (std::is_same_v<std::multiplies<>, typename E_nr::Op>) {
+    return adaptive_eval<eval_type>(expr.lhs()) *
+           adaptive_eval<eval_type>(expr.rhs());
   } else {
-    return _impl::adaptive_eval_impl<E, eval_type>().eval(expr);
+    auto [checked_result, _] = eval_checked_fast<eval_type>(expr);
+    if (std::isnan(checked_result)) {
+      return _impl::adaptive_eval_impl<E, eval_type>().eval(expr);
+    } else {
+      return checked_result;
+    }
   }
 }
 
@@ -196,7 +205,8 @@ private:
 
       // Multiplication doesn't affect the final sign, so don't exactly evaluate
       // it unless the upper part of the expression requires it
-      if constexpr (!std::is_same_v<std::multiplies<>, Op> && depth(sub_expr{}) > 2) {
+      if constexpr (!std::is_same_v<std::multiplies<>, Op> &&
+                    depth(sub_expr{}) > 2) {
         // If we're adding values of the same sign, or subtracting opposing
         // signs, the final sign is unaffected unless the relative error is too
         // large. Do a cheap check first, then a slightly more expensive check
