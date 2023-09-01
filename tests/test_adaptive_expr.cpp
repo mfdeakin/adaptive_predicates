@@ -266,6 +266,46 @@ static_assert(
                    branch_token_left<branch_token_right<branch_token_tag>>,
                    branch_token_right<branch_token_tag>>>);
 
+TEST_CASE("adaptive_construction", "[eval_checked_fast_functor]") {
+  REQUIRE(eval_checked_fast<real>(arith_expr{}).first == 0.0);
+  REQUIRE(eval_checked_fast<real>(arith_expr{} + 7.0).first == 7.0);
+  REQUIRE(eval_checked_fast<real>((arith_expr{} + 7.0) * 2.0).first == 14.0);
+  REQUIRE(std::isnan(
+      eval_checked_fast<real>((arith_expr{} + 7.0) * 2.0 - 14.0).first));
+
+  for (auto [points, expected] : orient2d_cases) {
+    const auto e = build_orient2d_case(points);
+    const auto result = eval_checked_fast<real>(e).first;
+    CHECK((std::isnan(result) || check_sign(expected, result)));
+  }
+}
+
+TEST_CASE("adaptive_construction", "[eval_with_err_functor]") {
+  REQUIRE(eval_with_err<real>(arith_expr{}).first == 0.0);
+  REQUIRE(eval_with_err<real>(arith_expr{} + 7.0).first == 7.0);
+  REQUIRE(eval_with_err<real>((arith_expr{} + 7.0) * 2.0).first == 14.0);
+  REQUIRE(
+      std::isnan(eval_with_err<real>((arith_expr{} + 7.0) * 2.0 - 14.0).first));
+
+  for (auto [points, expected] : orient2d_cases) {
+    const auto e = build_orient2d_case(points);
+    const auto result = eval_with_err<real>(e).first;
+    CHECK((std::isnan(result) || check_sign(expected, result)));
+  }
+}
+
+TEST_CASE("adaptive_construction", "[exact_eval_functor]") {
+  REQUIRE(exactfp_eval<real>(arith_expr{}) == 0.0);
+  REQUIRE(exactfp_eval<real>(arith_expr{} + 7.0) == 7.0);
+  REQUIRE(exactfp_eval<real>((arith_expr{} + 7.0) * 2.0) == 14.0);
+  REQUIRE(exactfp_eval<real>((arith_expr{} + 7.0) * 2.0 - 14.0) == 0.0);
+
+  for (auto [points, expected] : orient2d_cases) {
+    const auto e = build_orient2d_case(points);
+    CHECK(check_sign(expected, exactfp_eval<real>(e)));
+  }
+}
+
 TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
   REQUIRE(adaptive_eval<real>(arith_expr{}) == 0.0);
   REQUIRE(adaptive_eval<real>(arith_expr{} + 7.0) == 7.0);
@@ -275,11 +315,20 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
   for (auto [points, expected] : orient2d_cases) {
     const auto e = build_orient2d_case(points);
     CHECK(check_sign(expected, adaptive_eval<real>(e)));
-    CHECK(check_sign(expected, exactfp_eval<real>(e)));
   }
 }
 
 #if defined(__cpp_lib_ranges_slide) && defined(__FMA__)
+TEST_CASE("eval_checked_fast_simd", "[simd_eval_checked_fast_functor]") {
+  for (auto window : orient2d_cases | std::views::slide(vec_size)) {
+    const auto [e, expected] = build_orient2d_vec_case(window);
+    const auto result = eval_checked_fast<Vec4d>(e).first;
+    for (size_t i = 0; i < vec_size; ++i) {
+      CHECK((std::isnan(result[i]) || check_sign(expected[i], result[i])));
+    }
+  }
+}
+
 TEST_CASE("eval_with_err_simd", "[simd_eval_with_err_functor]") {
   for (auto window : orient2d_cases | std::views::slide(vec_size)) {
     const auto [e, expected] = build_orient2d_vec_case(window);
@@ -310,10 +359,10 @@ static_assert(max_rel_error<real, decltype(arith_expr{})>() ==
 static_assert(max_rel_error<real, decltype(arith_expr{} + 4)>() ==
               std::numeric_limits<real>::epsilon());
 
-static_assert(max_rel_error<real, decltype(arith_expr{} + 4 - 7)>() ==
+static_assert(max_rel_error<real, decltype(arith_expr{} + 4 - 7)>() <=
               std::numeric_limits<real>::epsilon() * 2);
 
-static_assert(max_rel_error<real, decltype((arith_expr{} + 4 - 7) * 5)>() ==
+static_assert(max_rel_error<real, decltype((arith_expr{} + 4 - 7) * 5)>() <=
               std::numeric_limits<real>::epsilon() * 4);
 
 static_assert(max_rel_error<real, decltype((arith_expr{} + 4 - 7) *

@@ -12,7 +12,8 @@ if(!evaluatable) {
     float rounded_exact_val = exact_eval<float>(expr * 32.0);
 }
 ```
-There are 4 primary eval_methods:
+There are 5 primary eval_methods:
+* `eval_checked_fast`: Returns a pair with the approximate result as the first parameter, and a bool indicating whether relative error analysis is useful on the result. If the result isn't guaranteed to have the correct sign based on relative error analysis, then the first return is NaN. This works with vector types with an associated `select` method. Note that this is not as discerning as `eval_with_err`, though it is much faster with expressions with only a few additions/subtractions above the 2nd level of the expression tree.
 * `correct_eval`: Returns an `std::optional` after evaluating with the specified floating point type if the result is guaranteed to have the correct sign based on relative error analysis. This computes relative error filters at compile-time, and if the maximum relative error ever exceeds 1, it returns nullopt. In the testing benchmarks this is about 3x slower than a basic floating point evaluation. This does not work with vector operations, use `eval_with_err` directly instead.
 * `eval_with_err`: Returns a pair containing the approximate result and the estimated error if the result is guaranteed to have the correct sign based on relative error analysis. If not, then it returns NaN. This works with vector types with an associated `select` method.
 * `adaptive_eval`: Returns a value with the correct sign, but not necessarily a good representative of the exact result. For latency sensitive applications, use this.

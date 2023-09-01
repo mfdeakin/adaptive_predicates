@@ -91,6 +91,57 @@ constexpr std::pair<eval_type, eval_type> eval_with_err(E_ &&e) noexcept {
   }
 }
 
+// Returns the approximate value or a NaN if its sign can't be guaranteed
+// This only performs an extra addition and multiplication by a compile time
+// value, followed by a comparison to filter out obviously correct results.
+// The additional bool return indicates whether future relative error analysis
+// with max_reul_error is useful
+template <arith_number eval_type, typename E_>
+  requires(expr_type<E_> || arith_number<E_>)
+constexpr auto eval_checked_fast(E_ &&e) noexcept {
+  using E = std::remove_cvref_t<E_>;
+  using bool_type = decltype(eval_type{} < eval_type{});
+  if constexpr (is_expr_v<E>) {
+    const auto [left_result, left_no_subtract] =
+        eval_checked_fast<eval_type>(e.lhs());
+    auto [right_result, right_no_subtract] =
+        eval_checked_fast<eval_type>(e.rhs());
+    const auto no_lower_subtract = left_no_subtract && right_no_subtract;
+    using Op = typename E::Op;
+    const eval_type result = Op{}(left_result, right_result);
+
+    if constexpr (!std::is_same_v<std::multiplies<>, Op> && depth(E{}) > 2) {
+      const eval_type nan{std::numeric_limits<double>::signaling_NaN()};
+      if constexpr (std::is_same_v<std::minus<>, Op>) {
+        right_result = -right_result;
+      }
+      const auto signs_match = same_sign_or_zero(left_result, right_result);
+      if constexpr (vector_type<eval_type>) {
+        using fp_type = decltype(left_result[0]);
+        const auto selector =
+            signs_match ||
+            (no_lower_subtract &&
+             (abs(result) > abs(left_result - right_result) *
+                                _impl::max_rel_error<fp_type, E>()));
+        return std::pair{select(selector, result, nan),
+                         no_lower_subtract && signs_match};
+      } else {
+        if (signs_match ||
+            (no_lower_subtract &&
+             (std::abs(result) > std::abs(left_result - right_result) *
+                                     _impl::max_rel_error<eval_type, E>()))) {
+          return std::pair{result, no_lower_subtract && signs_match};
+        } else {
+          return std::pair{nan, bool_type{false}};
+        }
+      }
+    }
+    return std::pair{result, no_lower_subtract};
+  } else {
+    return std::pair{static_cast<eval_type>(e), bool_type{true}};
+  }
+}
+
 // correct_eval either returns the result with an accuracy bounded by
 // max_rel_error<E>, or it returns std::nullopt
 // This is intended to make it easier to effectively run on GPUs - results that
@@ -99,9 +150,14 @@ constexpr std::pair<eval_type, eval_type> eval_with_err(E_ &&e) noexcept {
 template <arith_number eval_type, typename E>
   requires(expr_type<E> || arith_number<E>) && (!vector_type<E>)
 constexpr std::optional<eval_type> correct_eval(E &&e) noexcept {
-  const auto [result, _] = eval_with_err<eval_type>(std::forward<E>(e)); 
-  if(std::isnan(result)) {
-    return std::nullopt;
+  const auto [result, _] = eval_checked_fast<eval_type>(std::forward<E>(e));
+  if (std::isnan(result)) {
+    const auto [new_result, _] = eval_with_err<eval_type>(std::forward<E>(e));
+    if (std::isnan(new_result)) {
+      return std::nullopt;
+    } else {
+      return new_result;
+    }
   } else {
     return result;
   }

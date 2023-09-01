@@ -37,6 +37,9 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
     const auto e = build_orient2d_case(points1);
     return fp_eval<real>(e);
   };
+  BENCHMARK("eval checked fast 1") {
+    return eval_checked_fast<real>(build_orient2d_case(points1));
+  };
   BENCHMARK("correct or nothing 1") {
     return correct_eval<real>(build_orient2d_case(points1));
   };
@@ -81,6 +84,9 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   BENCHMARK("floating point 2") {
     const auto e = build_orient2d_case(points2);
     return fp_eval<real>(e);
+  };
+  BENCHMARK("eval checked fast 2") {
+    return eval_checked_fast<real>(build_orient2d_case(points2));
   };
   BENCHMARK("correct or nothing 2") {
     return correct_eval<real>(build_orient2d_case(points2));
@@ -127,6 +133,9 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
     const auto e = build_orient2d_case(points3);
     return fp_eval<real>(e);
   };
+  BENCHMARK("eval checked fast 3") {
+    return eval_checked_fast<real>(build_orient2d_case(points3));
+  };
   BENCHMARK("correct or nothing 3") {
     return correct_eval<real>(build_orient2d_case(points3));
   };
@@ -171,6 +180,9 @@ TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
   BENCHMARK("floating point 4") {
     const auto e = build_orient2d_case(points4);
     return fp_eval<real>(e);
+  };
+  BENCHMARK("eval checked fast 4") {
+    return eval_checked_fast<real>(build_orient2d_case(points4));
   };
   BENCHMARK("correct or nothing 4") {
     return correct_eval<real>(build_orient2d_case(points4));

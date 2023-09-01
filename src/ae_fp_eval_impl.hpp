@@ -81,8 +81,9 @@ template <arith_number eval_type>
 std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
                                            const eval_type &rhs);
 
-template <std::floating_point eval_type, typename E>
-  requires expr_type<E> || arith_number<E>
+// This technically would work with a vector_type, but would waste cycles
+template <typename eval_type, typename E>
+  requires((expr_type<E> || arith_number<E>) && (!vector_type<eval_type>))
 consteval eval_type max_rel_error() {
   if constexpr (is_expr_v<E>) {
     using Op = typename E::Op;
@@ -97,7 +98,7 @@ consteval eval_type max_rel_error() {
       if (max_left == 0 && max_right == 0) {
         return eps / 2;
       } else {
-        return std::max(max_left, max_right) * 2.0;
+        return std::max(max_left, max_right) + eps / (eval_type{2} - eps);
       }
     } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
       if (max_left == 0 && max_right == 0) {
