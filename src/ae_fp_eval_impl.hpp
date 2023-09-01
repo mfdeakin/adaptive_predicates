@@ -53,7 +53,7 @@ template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
                                                     const eval_type &rhs);
 template <arith_number eval_type>
-  requires(!vector_type<eval_type>)
+  requires scalar_type<eval_type>
 constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
                                                      const eval_type &rhs);
 template <vector_type eval_type>
@@ -83,7 +83,7 @@ std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
 
 // This technically would work with a vector_type, but would waste cycles
 template <typename eval_type, typename E>
-  requires((expr_type<E> || arith_number<E>) && (!vector_type<eval_type>))
+  requires((expr_type<E> || arith_number<E>) && scalar_type<eval_type>)
 consteval eval_type max_rel_error() {
   if constexpr (is_expr_v<E>) {
     using Op = typename E::Op;
@@ -131,7 +131,7 @@ error_contributions(const eval_type left, const eval_type left_abs_err,
   } else if constexpr (std::is_same_v<Op, std::multiplies<>>) {
     return {abs(right) * left_abs_err, abs(left) * right_abs_err};
   } else {
-    if constexpr (!vector_type<eval_type>) {
+    if constexpr (scalar_type<eval_type>) {
       return {std::numeric_limits<eval_type>::signaling_NaN(),
               std::numeric_limits<eval_type>::signaling_NaN()};
     } else {
@@ -155,11 +155,11 @@ eval_with_max_abs_err(const eval_type left, const eval_type left_abs_err,
 
 constexpr auto error_overshoot(const arith_number auto result,
                                const arith_number auto max_abs_err) {
-  return max_abs_err - std::abs(result);
+  return max_abs_err - abs(result);
 }
 
 template <arith_number eval_type>
-  requires(!vector_type<eval_type>)
+  requires scalar_type<eval_type>
 constexpr bool
 error_overlaps(const eval_type left_result, const eval_type left_abs_err,
                const eval_type right_result, const eval_type right_abs_err) {
@@ -224,7 +224,7 @@ auto merge_sum_linear_fast(
   if (storage.size() > 1) {
     std::ranges::inplace_merge(
         storage, midpoint, [](const eval_type &left, const eval_type &right) {
-          return std::abs(left) < std::abs(right);
+          return abs(left) < abs(right);
         });
     auto nonzero_itr = storage.begin();
     for (; nonzero_itr != storage.end() && *nonzero_itr == eval_type{0};
@@ -261,7 +261,7 @@ auto merge_sum_linear(
   if (storage.size() > 1) {
     std::ranges::inplace_merge(
         storage, midpoint, [](const eval_type &left, const eval_type &right) {
-          return std::abs(left) < std::abs(right);
+          return abs(left) < abs(right);
         });
     auto nonzero_itr = storage.begin();
     for (; nonzero_itr != storage.end() && *nonzero_itr == eval_type{0};
@@ -392,10 +392,10 @@ void sparse_mult(span_l storage_left, span_r storage_right,
 }
 
 template <arith_number eval_type>
-  requires(!vector_type<eval_type>)
+  requires scalar_type<eval_type>
 constexpr std::pair<eval_type, eval_type> dekker_sum(const eval_type &lhs,
                                                      const eval_type &rhs) {
-  if (std::abs(lhs) >= std::abs(rhs)) {
+  if (abs(lhs) >= abs(rhs)) {
     return dekker_sum_unchecked(lhs, rhs);
   } else {
     return dekker_sum_unchecked(rhs, lhs);

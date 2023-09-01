@@ -19,7 +19,7 @@ template <typename E>
 concept predicate = expr_type<E> && comparison_op<typename E::Op>;
 
 template <arith_number eval_type>
-  requires(!vector_type<eval_type>)
+  requires scalar_type<eval_type>
 constexpr bool same_sign_or_zero(eval_type a, eval_type b) {
   if (a > 0) {
     return b >= 0;
@@ -36,7 +36,7 @@ constexpr auto same_sign_or_zero(eval_type a, eval_type b) {
 }
 
 template <typename eval_type>
-  requires(!vector_type<eval_type>)
+  requires scalar_type<eval_type>
 eval_type lowest_order_exp(const eval_type v) {
   if (v == eval_type{0}) {
     return 0;
@@ -52,18 +52,19 @@ eval_type lowest_order_exp(const eval_type v) {
 }
 
 template <std::ranges::range range_t>
-  requires(!vector_type<typename range_t::value_type>)
+  requires(arith_number<typename range_t::value_type> &&
+           scalar_type<typename range_t::value_type>)
 bool is_nonoverlapping(range_t vals) {
   using eval_type = typename range_t::value_type;
   if (vals.size() == 0) {
     return true;
   }
-  eval_type last = std::abs(vals[0]);
+  eval_type last = abs(vals[0]);
   for (auto cur : vals | std::ranges::views::drop(1) |
                       std::ranges::views::filter([](const eval_type v) {
                         return v != eval_type{0};
                       })) {
-    const auto v = lowest_order_exp(std::abs(cur));
+    const auto v = lowest_order_exp(abs(cur));
     if (last >= v) {
       return false;
     }

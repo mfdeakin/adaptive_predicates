@@ -40,10 +40,7 @@ private:
 
 class additive_id {
 public:
-  template <typename T>
-  operator T() const noexcept {
-    return T{0};
-  }
+  template <typename T> operator T() const noexcept { return T{0}; }
 };
 
 arith_expr() -> arith_expr<std::plus<>, additive_id, additive_id>;
@@ -90,12 +87,17 @@ concept arith_number = !expr_type<T> && requires {
 };
 
 template <typename T>
+concept not_scalar_type_ = requires { std::remove_cvref_t<T>{}[0]; };
+
+template <typename T>
+concept scalar_type = arith_number<T> && (!not_scalar_type_<T>);
+
+template <typename T>
 concept vector_type = arith_number<T> && requires {
   // vectors are indexable and have a 3 parameter select function which chooses
   // elements from the second element when the corresponding element in the
   // first element is true
   std::remove_cvref_t<T>{}[0];
-  std::remove_cvref_t<T>{}.size();
   select(std::remove_cvref_t<T>{} >= std::remove_cvref_t<T>{},
          std::remove_cvref_t<T>{}, std::remove_cvref_t<T>{});
 };

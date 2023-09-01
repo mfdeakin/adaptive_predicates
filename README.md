@@ -36,9 +36,10 @@ For example, (30.0 + 2.0) * (10.0 + 0.5) = (30.0 * 10.0 + 30.0 * 0.5 + 2.0 * 10.
 which might expand to (300.0 + 10.0 + 5.0 + 20.0 + 1.0).
 Division can't currently be computed exactly; but todo in the future, it will be handled by rewriting the expression in terms of multiplications.
 
-There are two concepts that are important to this library:
+There are three concepts that are important to this library:
 * `arith_number`: Any data-type that has `+`, `-`, `*`, operators and functions `abs` and `mul_sub`.
 `abs` is the regular absolute value function, and `mul_sub` computes `a * b - c` rounded to `1/2 epsilon` for your data-type.
 `mul_sub` is typically implemented with `fma` as `fma(a, b, -c)`
+* `scalar_type`: Any `arith_number` that does not have an `[]` operator.
 * `vector_type`: Any `arith_number` that also has an `[]` operator and a `select` method.
 `select` takes 3 parameters: the first a parameter `p` with the type returned by `v1 > v2` for `vector_type`s `v1` and `v2`, and 2 `vector_type` parameters, and returns a `vector_type` parameter containing elements from `v1` when the corresponding element in `p` is true or the element from `v2` when false.

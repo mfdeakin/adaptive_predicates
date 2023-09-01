@@ -128,8 +128,8 @@ constexpr auto eval_checked_fast(E_ &&e) noexcept {
       } else {
         if (signs_match ||
             (no_lower_subtract &&
-             (std::abs(result) > std::abs(left_result - right_result) *
-                                     _impl::max_rel_error<eval_type, E>()))) {
+             (abs(result) > abs(left_result - right_result) *
+                                _impl::max_rel_error<eval_type, E>()))) {
           return std::pair{result, no_lower_subtract && signs_match};
         } else {
           return std::pair{nan, bool_type{false}};
@@ -148,7 +148,7 @@ constexpr auto eval_checked_fast(E_ &&e) noexcept {
 // need to be evaluated more accurately can be aggregated into a separate
 // collection; small expressions will likely use the same code-paths
 template <arith_number eval_type, typename E>
-  requires(expr_type<E> || arith_number<E>) && (!vector_type<E>)
+  requires(expr_type<E> || arith_number<E>) && scalar_type<eval_type>
 constexpr std::optional<eval_type> correct_eval(E &&e) noexcept {
   const auto [result, _] = eval_checked_fast<eval_type>(std::forward<E>(e));
   if (std::isnan(result)) {

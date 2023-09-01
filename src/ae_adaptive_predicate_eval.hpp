@@ -20,7 +20,7 @@ class adaptive_eval_impl;
 } // namespace _impl
 
 template <arith_number eval_type, typename E>
-  requires(expr_type<E> || arith_number<E>) && (!vector_type<eval_type>)
+  requires(expr_type<E> || arith_number<E>) && scalar_type<eval_type>
 eval_type adaptive_eval(E &&expr) {
   using E_nr = std::remove_cvref_t<E>;
   if constexpr (sign_guaranteed(E_nr{})) {
@@ -108,7 +108,7 @@ private:
 
     const eval_type exact_result = std::reduce(memory.begin(), memory.end());
     exact_eval_info.result = exact_result;
-    return {exact_result, std::abs(exact_result) *
+    return {exact_result, abs(exact_result) *
                               std::numeric_limits<eval_type>::epsilon() / 2.0};
   }
 
@@ -190,7 +190,7 @@ private:
       branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
       if (exact_eval_info.result) {
         return {*exact_eval_info.result,
-                std::abs(*exact_eval_info.result) *
+                abs(*exact_eval_info.result) *
                     std::numeric_limits<eval_type>::epsilon() / 2.0};
       }
       using Op = typename sub_expr::Op;

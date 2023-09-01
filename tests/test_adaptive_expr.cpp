@@ -22,6 +22,20 @@ static_assert(arith_number<unsigned long long>);
 static_assert(arith_number<real>);
 static_assert(arith_number<Vec4f>);
 
+static_assert(scalar_type<int>);
+static_assert(scalar_type<long long>);
+static_assert(scalar_type<unsigned int>);
+static_assert(scalar_type<unsigned long long>);
+static_assert(scalar_type<real>);
+static_assert(!scalar_type<Vec4f>);
+
+static_assert(!vector_type<int>);
+static_assert(!vector_type<long long>);
+static_assert(!vector_type<unsigned int>);
+static_assert(!vector_type<unsigned long long>);
+static_assert(!vector_type<real>);
+static_assert(vector_type<Vec4f>);
+
 static_assert(is_expr_v<arith_expr<std::plus<>, real, real>>);
 static_assert(is_expr_v<const arith_expr<std::plus<>, real, real>>);
 static_assert(is_expr_v<arith_expr<std::plus<>, real, real> &>);
