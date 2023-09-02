@@ -6,7 +6,7 @@
 #include <fmt/format.h>
 
 #include "testing_utils.hpp"
-#include "ae_expr_io.hpp"
+#include "ae_expr_fmt.hpp"
 #include "ae_fp_eval.hpp"
 #include "ae_adaptive_predicate_eval.hpp"
 

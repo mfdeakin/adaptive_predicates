@@ -3,7 +3,6 @@
 #define ADAPTIVE_PREDICATES_AE_ADAPTIVE_PREDICATE_EVAL_HPP
 
 #include "ae_expr.hpp"
-#include "ae_expr_io.hpp"
 #include "ae_expr_utils.hpp"
 #include "ae_fp_eval.hpp"
 
