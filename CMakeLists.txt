@@ -21,6 +21,11 @@ target_sources(adaptive_predicates PUBLIC FILE_SET HEADERS
 
 install(TARGETS adaptive_predicates FILE_SET HEADERS)
 
+option(ADP_ENABLE_EXAMPLES "Examples" ON)
+if(ADP_ENABLE_EXAMPLES)
+  find_package(fmt REQUIRED)
+  add_subdirectory(examples)
+endif()
 
 option(ADP_ENABLE_TESTS "Test suite" ON)
 if(ADP_ENABLE_TESTS)
