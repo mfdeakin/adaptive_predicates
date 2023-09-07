@@ -60,7 +60,7 @@ bool is_nonoverlapping(range_t vals) {
     return true;
   }
   eval_type last = abs(vals[0]);
-  for (auto cur : vals | std::ranges::views::drop(1) |
+  for (auto cur : std::span{vals.begin() + 1, vals.end()} |
                       std::ranges::views::filter([](const eval_type v) {
                         return v != eval_type{0};
                       })) {

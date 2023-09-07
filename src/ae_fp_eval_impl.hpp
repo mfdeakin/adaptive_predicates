@@ -27,9 +27,10 @@ auto merge_sum_linear(
     std::ranges::range auto &&storage,
     const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type;
-auto merge_sum_linear_fast(std::ranges::range auto &&storage,
-                           const typename decltype(storage)::iterator midpoint)
-    -> typename decltype(storage)::value_type;
+auto merge_sum_linear_fast(
+    std::ranges::range auto &&storage,
+    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
+    typename std::remove_cvref_t<decltype(storage)>::value_type;
 auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type;
 auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage) ->
@@ -236,7 +237,7 @@ auto merge_sum_linear_fast(
     auto out = storage.begin();
     *out = q;
     ++out;
-    for (auto g : storage | std::views::drop(2)) {
+    for (auto g : std::span{storage.begin() + 2, storage.end()}) {
       auto [Qnew, h] = two_sum(Q, g);
       Q = Qnew;
       *out = h;
@@ -270,7 +271,7 @@ auto merge_sum_linear(
     std::ranges::rotate(storage, nonzero_itr);
     auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
     auto out = storage.begin();
-    for (auto h : storage | std::views::drop(2)) {
+    for (auto h : std::span{storage.begin() + 2, storage.end()}) {
       auto [R, g] = dekker_sum_unchecked(h, q);
       *out = g;
       ++out;
