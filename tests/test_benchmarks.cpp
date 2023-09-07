@@ -16,211 +16,107 @@
 
 using namespace adaptive_expr;
 
-TEST_CASE("BenchmarkDeterminant", "[benchmark]") {
-  Shewchuk::exactinit();
-  const auto points1 = orient2d_cases[0].first;
-  constexpr std::size_t x = 0;
-  constexpr std::size_t y = 1;
-  CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> pt0(
-      points1[0][x], points1[0][y]);
-  CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> pt1(
-      points1[1][x], points1[1][y]);
-  CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> pt2(
-      points1[2][x], points1[2][y]);
-  BENCHMARK("build expr 1") { return build_orient2d_case(points1); };
-  BENCHMARK("no expr floating point 1") {
-    return points1[1][x] * points1[2][y] - points1[1][y] * points1[2][x] -
-           points1[0][x] * points1[2][y] + points1[0][y] * points1[2][x] +
-           points1[0][x] * points1[1][y] - points1[0][y] * points1[1][x];
-  };
-  BENCHMARK("floating point 1") {
-    const auto e = build_orient2d_case(points1);
-    return fp_eval<real>(e);
-  };
-  BENCHMARK("eval checked fast 1") {
-    return eval_checked_fast<real>(build_orient2d_case(points1));
-  };
-  BENCHMARK("correct or nothing 1") {
-    return correct_eval<real>(build_orient2d_case(points1));
-  };
-  BENCHMARK("exact rounded 1") {
-    const auto e = build_orient2d_case(points1);
-    return exactfp_eval<real>(e);
-  };
-  BENCHMARK("adaptive 1") {
-    const auto e = build_orient2d_case(points1);
-    return adaptive_eval<real>(e);
-  };
-  BENCHMARK("matrix adaptive 1") {
-    auto mtx = build_orient2d_matrix(points1);
-    return determinant<real>(
-        mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
-  };
-  BENCHMARK("shewchuk floating point 1") {
-    return Shewchuk::orient2dfast(points1[0].data(), points1[1].data(),
-                                  points1[2].data());
-  };
-  BENCHMARK("shewchuk exact rounded 1") {
-    return Shewchuk::orient2d(points1[0].data(), points1[1].data(),
-                              points1[2].data());
-  };
-  BENCHMARK("cgal exact rounded 1") {
-    return CGAL::orientation(pt0, pt1, pt2);
-  };
+static constexpr std::size_t x = 0;
+static constexpr std::size_t y = 1;
 
-  const auto points2 = orient2d_cases[1].first;
-  pt0 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
-      points2[0][x], points2[0][y]);
-  pt1 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
-      points2[1][x], points2[1][y]);
-  pt2 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
-      points2[2][x], points2[2][y]);
-  BENCHMARK("build expr 2") { return build_orient2d_case(points2); };
-  BENCHMARK("no expr floating point 2") {
-    return points2[1][x] * points2[2][y] - points2[1][y] * points2[2][x] -
-           points2[0][x] * points2[2][y] + points2[0][y] * points2[2][x] +
-           points2[0][x] * points2[1][y] - points2[0][y] * points2[1][x];
-  };
-  BENCHMARK("floating point 2") {
-    const auto e = build_orient2d_case(points2);
-    return fp_eval<real>(e);
-  };
-  BENCHMARK("eval checked fast 2") {
-    return eval_checked_fast<real>(build_orient2d_case(points2));
-  };
-  BENCHMARK("correct or nothing 2") {
-    return correct_eval<real>(build_orient2d_case(points2));
-  };
-  BENCHMARK("exact rounded 2") {
-    const auto e = build_orient2d_case(points2);
-    return exactfp_eval<real>(e);
-  };
-  BENCHMARK("adaptive 2") {
-    const auto e = build_orient2d_case(points2);
-    return adaptive_eval<real>(e);
-  };
-  BENCHMARK("matrix adaptive 2") {
-    auto mtx = build_orient2d_matrix(points2);
-    return determinant<real>(
-        mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
-  };
-  BENCHMARK("shewchuk floating point 2") {
-    return Shewchuk::orient2dfast(points2[0].data(), points2[1].data(),
-                                  points2[2].data());
-  };
-  BENCHMARK("shewchuk exact rounded 2") {
-    return Shewchuk::orient2d(points2[0].data(), points2[1].data(),
-                              points2[2].data());
-  };
-  BENCHMARK("cgal exact rounded 2") {
-    return CGAL::orientation(pt0, pt1, pt2);
-  };
+#define BENCHMARK_CASE(TEST_PREAMBLE, BENCHMARK_CALL_METHOD, name, tags,       \
+                       method, points)                                         \
+  TEST_CASE(name " - [!benchmark]" tags, "[!benchmark]" tags) {                \
+    TEST_PREAMBLE(points)                                                      \
+    BENCHMARK(name) { return BENCHMARK_CALL_METHOD(method); };                 \
+  }
 
-  const auto points3 = orient2d_cases[2].first;
-  pt0 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
-      points3[0][x], points3[0][y]);
-  pt1 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
-      points3[1][x], points3[1][y]);
-  pt2 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
-      points3[2][x], points3[2][y]);
-  BENCHMARK("build expr 3") { return build_orient2d_case(points3); };
-  BENCHMARK("no expr floating point 3") {
-    return points3[1][x] * points3[2][y] - points3[1][y] * points3[2][x] -
-           points3[0][x] * points3[2][y] + points3[0][y] * points3[2][x] +
-           points3[0][x] * points3[1][y] - points3[0][y] * points3[1][x];
-  };
-  BENCHMARK("floating point 3") {
-    const auto e = build_orient2d_case(points3);
-    return fp_eval<real>(e);
-  };
-  BENCHMARK("eval checked fast 3") {
-    return eval_checked_fast<real>(build_orient2d_case(points3));
-  };
-  BENCHMARK("correct or nothing 3") {
-    return correct_eval<real>(build_orient2d_case(points3));
-  };
-  BENCHMARK("exact rounded 3") {
-    const auto e = build_orient2d_case(points3);
-    return exactfp_eval<real>(e);
-  };
-  BENCHMARK("adaptive 3") {
-    const auto e = build_orient2d_case(points3);
-    return adaptive_eval<real>(e);
-  };
-  BENCHMARK("matrix adaptive 3") {
-    auto mtx = build_orient2d_matrix(points3);
-    return determinant<real>(
-        mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
-  };
-  BENCHMARK("shewchuk floating point 3") {
-    return Shewchuk::orient2dfast(points3[0].data(), points3[1].data(),
-                                  points3[2].data());
-  };
-  BENCHMARK("shewchuk exact rounded 3") {
-    return Shewchuk::orient2d(points3[0].data(), points3[1].data(),
-                              points3[2].data());
-  };
-  BENCHMARK("cgal exact rounded 3") {
-    return CGAL::orientation(pt0, pt1, pt2);
-  };
+#define CGAL_PREAMBLE(points)                                                  \
+  CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt0(   \
+      points[0][x], points[0][y]);                                             \
+  CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt1(   \
+      points[1][x], points[1][y]);                                             \
+  CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt2(   \
+      points[2][x], points[2][y]);
 
-  const auto points4 = orient2d_cases[17].first;
-  pt0 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
-      points4[0][x], points4[0][y]);
-  pt1 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
-      points4[1][x], points4[1][y]);
-  pt2 = CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel>(
-      points4[2][x], points4[2][y]);
-  BENCHMARK("build expr 4") { return build_orient2d_case(points4); };
-  BENCHMARK("no expr floating point 4") {
-    return points4[1][x] * points4[2][y] - points4[1][y] * points4[2][x] -
-           points4[0][x] * points4[2][y] + points4[0][y] * points4[2][x] +
-           points4[0][x] * points4[1][y] - points4[0][y] * points4[1][x];
-  };
-  BENCHMARK("floating point 4") {
-    const auto e = build_orient2d_case(points4);
-    return fp_eval<real>(e);
-  };
-  BENCHMARK("eval checked fast 4") {
-    return eval_checked_fast<real>(build_orient2d_case(points4));
-  };
-  BENCHMARK("correct or nothing 4") {
-    return correct_eval<real>(build_orient2d_case(points4));
-  };
-  BENCHMARK("exact rounded 4") {
-    const auto e = build_orient2d_case(points4);
-    return exactfp_eval<real>(e);
-  };
-  BENCHMARK("adaptive 4") {
-    const auto e = build_orient2d_case(points4);
-    return adaptive_eval<real>(e);
-  };
-  BENCHMARK("matrix adaptive 4") {
-    auto mtx = build_orient2d_matrix(points4);
-    return determinant<real>(
-        mdspan<real, extents<std::size_t, 3, 3>>(mtx.data()));
-  };
-  BENCHMARK("shewchuk floating point 4") {
-    return Shewchuk::orient2dfast(points4[0].data(), points4[1].data(),
-                                  points4[2].data());
-  };
-  BENCHMARK("shewchuk exact rounded 4") {
-    return Shewchuk::orient2d(points4[0].data(), points4[1].data(),
-                              points4[2].data());
-  };
-  BENCHMARK("cgal exact rounded 4") {
-    return CGAL::orientation(pt0, pt1, pt2);
-  };
+#define CGAL_ORIENT2D_CALL_METHOD(method) method(cgal_pt0, cgal_pt1, cgal_pt2)
 
-  const std::array points_arr{
-      std::pair{points1, real{0}}, std::pair{points2, real{0}},
-      std::pair{points3, real{0}}, std::pair{points4, real{0}}};
-  BENCHMARK("floating point vector eval") {
-    const auto [e, _] = build_orient2d_vec_case(points_arr);
-    return fp_eval<Vec4d>(e);
-  };
-  BENCHMARK("exact vector eval") {
-    const auto [e, _] = build_orient2d_vec_case(points_arr);
-    return exactfp_eval<Vec4d>(e);
-  };
-}
+#define CGAL_ORIENT2D_CASE(name, tags, points)                                 \
+  BENCHMARK_CASE(CGAL_PREAMBLE, CGAL_ORIENT2D_CALL_METHOD, name,               \
+                 "[cgal][orient2d]" tags, CGAL::orientation, points)
+
+#define SHEWCHUK_ORIENT2D_PREAMBLE(points)                                     \
+  Shewchuk::exactinit();                                                       \
+  const real *sh_pt0 = points[0].data();                                       \
+  const real *sh_pt1 = points[1].data();                                       \
+  const real *sh_pt2 = points[2].data();
+
+#define SHEWCHUK_ORIENT2D_CALL_METHOD(method) method(sh_pt0, sh_pt1, sh_pt2)
+
+#define SHEWCHUK_ORIENT2D_CASE(name, tags, points)                             \
+  BENCHMARK_CASE(SHEWCHUK_ORIENT2D_PREAMBLE, SHEWCHUK_ORIENT2D_CALL_METHOD,    \
+                 name, "[shewchuk][orient2d]" tags, Shewchuk::orient2d,        \
+                 points)
+
+#define AE_ORIENT2D_PREAMBLE(points)                                           \
+  const auto expression = build_orient2d_case(points);
+
+#define AE_ORIENT2D_CALL_METHOD(method) method(expression)
+
+#define AE_ORIENT2D_CASE(name, tags, method, points)                           \
+  BENCHMARK_CASE(AE_ORIENT2D_PREAMBLE, AE_ORIENT2D_CALL_METHOD, name,          \
+                 "[ae_expression][orient2d]" tags, method, points)
+
+#define AE_MTX_ORIENT2D_PREAMBLE(points)                                       \
+  auto mtx_array = build_orient2d_matrix(points);                              \
+  const mdspan<real, extents<std::size_t, 3, 3>> expression(mtx_array.data());
+
+#define AE_MTX_ORIENT2D_CALL_METHOD(method) method(expression)
+
+#define AE_MTX_ORIENT2D_CASE(name, tags, method, points)                       \
+  BENCHMARK_CASE(AE_MTX_ORIENT2D_PREAMBLE, AE_MTX_ORIENT2D_CALL_METHOD, name,  \
+                 "[ae_expression][matrix][orient2d]" tags, method, points)
+
+#define ORIENT2D_POINTS_CASE(points, tag)                                      \
+  AE_ORIENT2D_CASE("Floating point evaluation", "[fp_eval]" tag,               \
+                   fp_eval<real>, points)                                      \
+  AE_ORIENT2D_CASE("Fast checked evaluation", "[eval_checked_fast]" tag,       \
+                   eval_checked_fast<real>, points)                            \
+  AE_ORIENT2D_CASE("Correct or nothing", "[correct_eval]" tag,                 \
+                   correct_eval<real>, points)                                 \
+  AE_ORIENT2D_CASE("Exact evaluation", "[exactfp_eval]" tag,                   \
+                   exactfp_eval<real>, points)                                 \
+  AE_ORIENT2D_CASE("Adaptive evaluation", "[adaptive_eval]" tag,               \
+                   adaptive_eval<real>, points)                                \
+  AE_MTX_ORIENT2D_CASE("Matrix Adaptive evaluation", "[adaptive_eval]" tag,    \
+                       determinant<real>, points)                              \
+  SHEWCHUK_ORIENT2D_CASE("Shewchuk Orient2D", tag, points)                     \
+  CGAL_ORIENT2D_CASE("CGAL Orient2D", tag, points)
+
+#define AE_VEC_ORIENT2D_PREAMBLE(points)                                       \
+  const auto [expression, _] = build_orient2d_vec_case(points);
+
+#define AE_VEC_ORIENT2D_CALL_METHOD(method) method(expression)
+
+#define AE_VEC_ORIENT2D_CASE(name, tags, method, points)                       \
+  BENCHMARK_CASE(AE_VEC_ORIENT2D_PREAMBLE, AE_VEC_ORIENT2D_CALL_METHOD, name,  \
+                 "[ae_expression][orient2d][vectorized]" tags, method, points)
+
+ORIENT2D_POINTS_CASE(orient2d_cases[0].first, "[points0]")
+ORIENT2D_POINTS_CASE(orient2d_cases[1].first, "[points1]")
+ORIENT2D_POINTS_CASE(orient2d_cases[2].first, "[points2]")
+ORIENT2D_POINTS_CASE(orient2d_cases[17].first, "[points3]")
+
+#define ORIENT2D_VEC_POINTS_CASE(points, tag)                                  \
+  AE_VEC_ORIENT2D_CASE("Floating point vector evaluation", "[fp_eval]" tag,    \
+                       fp_eval<Vec4d>, points)                                 \
+  AE_VEC_ORIENT2D_CASE("Fast checked vector evaluation",                       \
+                       "[eval_checked_fast]" tag, eval_checked_fast<Vec4d>,    \
+                       points)                                                 \
+  AE_VEC_ORIENT2D_CASE("Interval checked vector evaluation",                   \
+                       "[eval_with_err]" tag, eval_with_err<Vec4d>, points)    \
+  AE_VEC_ORIENT2D_CASE("Exact vector evaluation", "[exactfp_eval]" tag,        \
+                       exactfp_eval<Vec4d>, points)
+
+ORIENT2D_VEC_POINTS_CASE((std::array{
+                             orient2d_cases[0],
+                             orient2d_cases[1],
+                             orient2d_cases[2],
+                             orient2d_cases[17],
+                         }),
+                         "")
