@@ -16,6 +16,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 add_executable(tests test_adaptive_expr.cpp)
+target_compile_features(tests PRIVATE cxx_std_23)
 target_link_libraries(tests PRIVATE adaptive_predicates shewchuk Catch2::Catch2WithMain)
 target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/extern ${CMAKE_SOURCE_DIR}/extern/simd_vec)
 
@@ -28,20 +29,24 @@ endif()
 catch_discover_tests(tests)
 
 add_executable(test_matrix test_matrix.cpp)
+target_compile_features(test_matrix PRIVATE cxx_std_23)
 target_link_libraries(test_matrix PRIVATE adaptive_predicates Catch2::Catch2WithMain fmt::fmt)
 target_include_directories(test_matrix PRIVATE ${CMAKE_SOURCE_DIR}/extern)
 catch_discover_tests(test_matrix)
 
 add_executable(test_benchmarks test_benchmarks.cpp)
+target_compile_features(test_benchmarks PRIVATE cxx_std_23)
 target_link_libraries(test_benchmarks PRIVATE adaptive_predicates shewchuk Catch2::Catch2WithMain CGAL::CGAL fmt::fmt)
 target_include_directories(test_benchmarks PRIVATE ${CMAKE_SOURCE_DIR}/extern ${CMAKE_SOURCE_DIR}/extern/simd_vec)
 catch_discover_tests(test_benchmarks)
 
 add_executable(perf_benchmark perf_benchmark.cpp)
+target_compile_features(perf_benchmark PRIVATE cxx_std_23)
 target_compile_options(perf_benchmark PUBLIC -fno-omit-frame-pointer)
 target_link_libraries(perf_benchmark PRIVATE adaptive_predicates fmt::fmt)
 target_include_directories(perf_benchmark PRIVATE ${CMAKE_SOURCE_DIR}/extern)
 
 add_executable(generate_cases generate_cases.cpp)
+target_compile_features(generate_cases PRIVATE cxx_std_23)
 target_link_libraries(generate_cases PRIVATE adaptive_predicates fmt::fmt)
 target_include_directories(generate_cases PRIVATE ${CMAKE_SOURCE_DIR}/extern)

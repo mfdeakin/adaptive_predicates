@@ -10,7 +10,7 @@ add_library(adaptive_predicates INTERFACE
   src/ae_expr.hpp src/ae_expr_utils.hpp src/ae_fp_eval.hpp src/ae_fp_eval_impl.hpp
   src/ae_expr_utils.hpp src/ae_expr_iostream.hpp src/ae_expr_print.hpp src/ae_expr_fmt.hpp
   src/ae_adaptive_predicate_eval.hpp)
-target_compile_features(adaptive_predicates INTERFACE cxx_std_23)
+target_compile_features(adaptive_predicates INTERFACE cxx_std_20)
 target_include_directories(adaptive_predicates INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_sources(adaptive_predicates PUBLIC FILE_SET HEADERS
