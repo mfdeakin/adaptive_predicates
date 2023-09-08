@@ -19,7 +19,7 @@ There are 5 primary eval_methods:
 * `adaptive_eval`: Returns a value with the correct sign, but not necessarily a good representative of the exact result. For latency sensitive applications, use this. This runs `eval_checked_fast` before attempting to perform adaptive evaluation, and if that fails, uses interval arithmetic to ensure that no sign errors can occur. After that, it uses a simple compile-time latency analysis to try to choose the sub-tree to evaluate. This does not support vector types, and adaptive evaluation that ends up exactly evaluating the entire expression will be more expensive than `exact_eval`.
 * `exact_eval`: Computes the result exactly, and then rounds it to the specified output format. This is consistently very slow, however, unlike adaptive_eval, it supports running on SIMD types that satisfy the `vector_type` concept. For high throughput applications, use this on expressions after determining they need exact evaluation.
 
-**Note:** To run efficiently on a GPU, use a vector type indexed by the thread with one of the methods supporting vector types
+**Note:** To run efficiently on a GPU, use the provided `GPUVec` type as the `eval_type` parameter to `exact_eval`
 
 The `arith_expr` class represents the expression template as a binary tree; it takes 3 template parameters:
 * `Op`: A functor representing the arithmetic expression to be applied; generally one of `std::plus`, `std::minus`, or `std::multiplies`

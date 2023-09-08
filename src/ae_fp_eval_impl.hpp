@@ -31,12 +31,12 @@ auto merge_sum_linear_fast(
     std::ranges::range auto &&storage,
     const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type;
-auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
+constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type;
-auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage) ->
-    typename std::remove_cvref_t<decltype(storage)>::value_type;
+constexpr auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage)
+    -> typename std::remove_cvref_t<decltype(storage)>::value_type;
 
-auto merge_sum(std::ranges::range auto storage) ->
+constexpr auto merge_sum(std::ranges::range auto storage) ->
     typename decltype(storage)::value_type {
   if constexpr (vector_type<typename decltype(storage)::value_type>) {
     return merge_sum_quadratic_keep_zeros(storage);
@@ -47,8 +47,8 @@ auto merge_sum(std::ranges::range auto storage) ->
 
 template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_m>
-void sparse_mult(span_l storage_left, span_r storage_right,
-                 span_m storage_mult);
+constexpr void sparse_mult(span_l storage_left, span_r storage_right,
+                           span_m storage_mult);
 
 template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
@@ -79,8 +79,8 @@ constexpr std::pair<eval_type, eval_type> two_sum(const eval_type &lhs,
 }
 
 template <arith_number eval_type>
-std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
-                                           const eval_type &rhs);
+constexpr std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
+                                                     const eval_type &rhs);
 
 // This technically would work with a vector_type, but would waste cycles
 template <typename eval_type, typename E>
@@ -291,7 +291,7 @@ auto merge_sum_linear(
   }
 }
 
-auto merge_sum_append(auto begin, auto end, auto v) {
+constexpr auto merge_sum_append(auto begin, auto end, auto v) {
   using eval_type = decltype(v);
   auto out = begin;
   for (auto &e : std::span{begin, end}) {
@@ -306,7 +306,7 @@ auto merge_sum_append(auto begin, auto end, auto v) {
   return std::pair{out, v};
 }
 
-auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
+constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type {
   using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
@@ -335,18 +335,18 @@ auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
   }
 }
 
-auto merge_sum_append_keep_zeros(auto begin, auto end) {
+constexpr auto merge_sum_append_keep_zeros(auto begin, auto end) {
   auto v = *end;
-  for (auto &e : std::span{begin, end}) {
-    const auto [result, error] = two_sum(v, e);
-    e = error;
+  for (auto e = begin; e != end; ++e) {
+    const auto [result, error] = two_sum(v, *e);
+    *e = error;
     v = result;
   }
   return v;
 }
 
-auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage) ->
-    typename std::remove_cvref_t<decltype(storage)>::value_type {
+constexpr auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage)
+    -> typename std::remove_cvref_t<decltype(storage)>::value_type {
   using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
     for (auto inp = storage.begin(); inp != storage.end(); ++inp) {
@@ -362,8 +362,8 @@ auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage) ->
 
 template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_m>
-void sparse_mult(span_l storage_left, span_r storage_right,
-                 span_m storage_mult) {
+constexpr void sparse_mult(span_l storage_left, span_r storage_right,
+                           span_m storage_mult) {
 #ifndef __FMA__
   static_assert(!vector_type<typename span_l::value_type>,
                 "Vectorization doesn't have a functional mul_sub method, "
@@ -381,8 +381,12 @@ void sparse_mult(span_l storage_left, span_r storage_right,
   // increasing magnitude before multiplying, the first element in the output is
   // the least significant and the last element is the most significant
   auto out_i = storage_mult.end() - 1;
-  for (auto r : storage_right | std::views::reverse) {
-    for (auto l : storage_left | std::views::reverse) {
+  for (auto r_itr = storage_right.rbegin(); r_itr != storage_right.rend();
+       ++r_itr) {
+    const auto r = *r_itr;
+    for (auto l_itr = storage_left.rbegin(); l_itr != storage_left.rend();
+         ++l_itr) {
+      const auto l = *l_itr;
       auto [upper, lower] = exact_mult(r, l);
       *out_i = upper;
       --out_i;
@@ -443,8 +447,8 @@ constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
 }
 
 template <arith_number eval_type>
-std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
-                                           const eval_type &rhs) {
+constexpr std::pair<eval_type, eval_type> exact_mult(const eval_type &lhs,
+                                                     const eval_type &rhs) {
   eval_type big = lhs * rhs;
   return {big, mul_sub(lhs, rhs, big)};
 }

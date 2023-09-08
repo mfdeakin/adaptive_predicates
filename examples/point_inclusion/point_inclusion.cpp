@@ -12,18 +12,24 @@
 
 #include "ae_adaptive_predicate_eval.hpp"
 #include "ae_fp_eval.hpp"
+#include "ae_gpu_scalar.hpp"
+
+using std::signbit;
 
 using real = double;
 
 using ExecSpace = Kokkos::DefaultExecutionSpace;
 
-enum class PointLocation { Inside, OnSurface, Outside, Indeterminant };
+enum class PointLocation { Inside, OnSurface, Outside, Indeterminant, Wrong };
 
 #ifdef KOKKOS_ENABLE_CUDA
 constexpr bool is_cpu() { return !std::is_same_v<Kokkos::Cuda, ExecSpace>; }
 #else
 constexpr bool is_cpu() { return true; }
 #endif // KOKKOS_ENABLE_CUDA
+
+using eval_type =
+    std::conditional_t<is_cpu(), real, adaptive_expr::GPUVec<real>>;
 
 int main(int argc, char *argv[]) {
   Kokkos::ScopeGuard kokkos(argc, argv);
@@ -104,18 +110,25 @@ int main(int argc, char *argv[]) {
                         (x_diff * x_diff + y_diff * y_diff + z_diff * z_diff) -
                         real{1};
                     const auto [result, _] =
-                        adaptive_expr::eval_checked_fast<real>(ex);
+                        adaptive_expr::eval_checked_fast<eval_type>(ex);
+                    const real exact =
+                        adaptive_expr::exactfp_eval<eval_type>(ex);
 
                     PointLocation &loc = ellipsoid_locs(i, j * vec_size + k);
                     using std::isnan;
-                    if (isnan(result)) {
+                    if (isnan(static_cast<real>(result))) {
                       loc = PointLocation::Indeterminant;
-                    } else if (result < 0.0) {
-                      loc = PointLocation::Inside;
-                    } else if (result == 0.0) {
-                      loc = PointLocation::OnSurface;
                     } else {
-                      loc = PointLocation::Outside;
+                      if (exact != 0 && static_cast<real>(result) != 0 &&
+                          signbit(exact) != signbit(static_cast<real>(result))) {
+                        loc = PointLocation::Wrong;
+                      } else if (static_cast<real>(result) < 0.0) {
+                        loc = PointLocation::Inside;
+                      } else if (static_cast<real>(result) == 0.0) {
+                        loc = PointLocation::OnSurface;
+                      } else {
+                        loc = PointLocation::Outside;
+                      }
                     }
                   });
             });
@@ -130,7 +143,17 @@ int main(int argc, char *argv[]) {
         }
       },
       num_indeterminant);
-  fmt::println("{} / {} points locations evaluated incorrectly",
-               num_indeterminant, num_ellipsoids * num_test_points);
+  int num_wrong = 0;
+  Kokkos::parallel_reduce(
+      num_ellipsoids * num_test_points,
+      KOKKOS_LAMBDA(const int i, int &count) {
+        if (ellipsoid_locs(i / num_test_points, i % num_test_points) ==
+            PointLocation::Wrong) {
+          ++count;
+        }
+      },
+      num_wrong);
+  fmt::println("({}, {}) / {} points locations evaluated incorrectly",
+               num_indeterminant, num_wrong, num_ellipsoids * num_test_points);
   return 0;
 }
