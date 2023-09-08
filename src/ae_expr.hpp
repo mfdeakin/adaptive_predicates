@@ -68,9 +68,9 @@ T mul_sub(const T a, const T b, const T c) {
   return std::fma(a, b, -c);
 }
 
-template <std::signed_integral T> T abs(const T a) { return std::abs(a); }
-template <std::floating_point T> T abs(const T a) { return std::abs(a); }
-template <std::unsigned_integral T> T abs(const T a) { return a; }
+template <std::signed_integral T> constexpr T abs(const T a) { return std::abs(a); }
+template <std::floating_point T> constexpr T abs(const T a) { return std::abs(a); }
+template <std::unsigned_integral T> constexpr T abs(const T a) { return a; }
 
 template <typename T>
 concept arith_number = !expr_type<T> && requires {
@@ -113,30 +113,30 @@ concept arith_expr_operands =
 template <typename Op, typename LHS_, typename RHS_>
   requires arith_expr_operands<LHS_, RHS_> ||
            (arith_number<LHS_> && arith_number<RHS_>)
-auto make_expr(LHS_ &&lhs, RHS_ &&rhs) {
+constexpr auto make_expr(LHS_ &&lhs, RHS_ &&rhs) {
   using LHS = std::remove_cvref_t<LHS_>;
   using RHS = std::remove_cvref_t<RHS_>;
   return arith_expr<Op, LHS, RHS>(std::forward<LHS_>(lhs),
                                   std::forward<RHS_>(rhs));
 }
 
-template <typename LHS, typename RHS> auto plus_expr(LHS &&lhs, RHS &&rhs) {
+template <typename LHS, typename RHS> constexpr auto plus_expr(LHS &&lhs, RHS &&rhs) {
   return make_expr<std::plus<>>(std::forward<LHS>(lhs), std::forward<RHS>(rhs));
 }
 
-template <typename LHS, typename RHS> auto minus_expr(LHS &&lhs, RHS &&rhs) {
+template <typename LHS, typename RHS> constexpr auto minus_expr(LHS &&lhs, RHS &&rhs) {
   return make_expr<std::minus<>>(std::forward<LHS>(lhs),
                                  std::forward<RHS>(rhs));
 }
 
-template <typename LHS, typename RHS> auto mult_expr(LHS &&lhs, RHS &&rhs) {
+template <typename LHS, typename RHS> constexpr auto mult_expr(LHS &&lhs, RHS &&rhs) {
   return make_expr<std::multiplies<>>(std::forward<LHS>(lhs),
                                       std::forward<RHS>(rhs));
 }
 
 template <typename LHS, typename RHS>
   requires(!std::is_same_v<RHS, additive_id>)
-auto divide_expr(LHS &&lhs, RHS &&rhs) {
+constexpr auto divide_expr(LHS &&lhs, RHS &&rhs) {
   return make_expr<std::divides<>>(std::forward<LHS>(lhs),
                                    std::forward<RHS>(rhs));
 }

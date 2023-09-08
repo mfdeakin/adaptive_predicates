@@ -123,22 +123,25 @@ constexpr auto eval_checked_fast(E_ &&e) noexcept {
             (no_lower_subtract &&
              (abs(result) > abs(left_result - right_result) *
                                 _impl::max_rel_error<fp_type, E>()));
-        return std::pair{select(selector, result, nan),
-                         no_lower_subtract && signs_match};
+        return std::pair<eval_type, bool_type>{
+            select(selector, result, nan), no_lower_subtract && signs_match};
       } else {
         if (signs_match ||
             (no_lower_subtract &&
              (abs(result) > abs(left_result - right_result) *
-                                _impl::max_rel_error<eval_type, E>()))) [[likely]] {
-          return std::pair{result, no_lower_subtract && signs_match};
+                                _impl::max_rel_error<eval_type, E>())))
+            [[likely]] {
+          return std::pair<eval_type, bool_type>{result, no_lower_subtract &&
+                                                             signs_match};
         } else {
-          return std::pair{nan, bool_type{false}};
+          return std::pair<eval_type, bool_type>{nan, bool_type{false}};
         }
       }
     }
-    return std::pair{result, no_lower_subtract};
+    return std::pair<eval_type, bool_type>{result, no_lower_subtract};
   } else {
-    return std::pair{static_cast<eval_type>(e), bool_type{true}};
+    return std::pair<eval_type, bool_type>{static_cast<eval_type>(e),
+                                           bool_type{true}};
   }
 }
 

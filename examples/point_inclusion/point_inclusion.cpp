@@ -17,6 +17,8 @@ using real = double;
 
 using ExecSpace = Kokkos::DefaultExecutionSpace;
 
+enum class PointLocation { Inside, OnSurface, Outside, Indeterminant };
+
 #ifdef KOKKOS_ENABLE_CUDA
 constexpr bool is_cpu() { return !std::is_same_v<Kokkos::Cuda, ExecSpace>; }
 #else
@@ -68,7 +70,6 @@ int main(int argc, char *argv[]) {
         rand_gen.free_state(generator);
       });
 
-  enum class PointLocation { Inside, OnSurface, Outside, Indeterminant };
   Kokkos::View<PointLocation **> ellipsoid_locs(
       "Ellipsoid Locations", num_ellipsoids, num_test_points);
 
@@ -89,7 +90,7 @@ int main(int argc, char *argv[]) {
             Kokkos::TeamThreadRange(team, num_test_points / vec_size),
             [&](const int j) {
               Kokkos::parallel_for(
-                  Kokkos::TeamVectorRange(team, vec_size), [&](const int k) {
+                  Kokkos::ThreadVectorRange(team, vec_size), [&](const int k) {
                     const real &x_p = x_pos(j * vec_size + k);
                     const real &y_p = y_pos(j * vec_size + k);
                     const real &z_p = z_pos(j * vec_size + k);
