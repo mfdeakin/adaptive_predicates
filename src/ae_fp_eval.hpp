@@ -29,23 +29,16 @@ constexpr eval_type fp_eval(E_ &&e) noexcept {
   }
 }
 
-template <arith_number eval_type, typename E>
-  requires expr_type<E> || arith_number<E>
-constexpr eval_type exactfp_eval(E &&e) noexcept {
-  if constexpr (is_expr_v<std::remove_reference_t<E>>) {
-    auto partial_results = []() {
-      constexpr std::size_t max_stack_storage = 1024 / sizeof(eval_type);
-      constexpr std::size_t storage_needed = num_partials_for_exact<E>();
-      if constexpr (storage_needed > max_stack_storage) {
-        return std::vector<eval_type>(storage_needed);
-      } else {
-        return std::array<eval_type, storage_needed>{};
-      }
-    }();
-    std::span<eval_type, num_partials_for_exact<E>()> partial_span{
-        partial_results};
-    _impl::exactfp_eval_impl<eval_type>(std::forward<E>(e), partial_span);
-    return _impl::merge_sum(partial_span);
+template <arith_number eval_type, typename E_>
+  requires expr_type<E_> || arith_number<E_>
+constexpr eval_type exactfp_eval(E_ &&e) noexcept {
+  using E = std::remove_cvref_t<E_>;
+  if constexpr (is_expr_v<E>) {
+    auto partial_results_mem = allocate_exact_mem<eval_type, E>();
+    std::span<eval_type, num_partials_for_exact<E>()> partial_results =
+        make_span<num_partials_for_exact<E>()>(partial_results_mem);
+    _impl::exactfp_eval_impl<eval_type>(std::forward<E_>(e), partial_results);
+    return _impl::merge_sum(partial_results);
     // return std::accumulate(partial_results.begin(), partial_results.end(),
     // eval_type(0));
   } else {

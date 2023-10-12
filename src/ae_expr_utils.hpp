@@ -321,6 +321,43 @@ template <typename E_> consteval std::size_t num_partials_for_exact() {
   }
 }
 
+#ifndef __CUDA_ARCH__
+template <arith_number eval_type, expr_type E>
+constexpr auto allocate_exact_mem() {
+  constexpr std::size_t max_stack_storage = 1024 / sizeof(eval_type);
+  constexpr std::size_t storage_needed = num_partials_for_exact<E>();
+  if constexpr (storage_needed > max_stack_storage) {
+    return std::vector<eval_type>(storage_needed);
+  } else {
+    return std::array<eval_type, storage_needed>{};
+  }
+}
+#else
+template <arith_number eval_type, expr_type E>
+constexpr auto allocate_exact_mem() {
+  constexpr std::size_t max_shared_storage = 48 * 1024 / sizeof(eval_type);
+  constexpr std::size_t storage_needed = num_partials_for_exact<E>();
+  if constexpr (storage_needed < max_shared_storage) {
+    extern __shared__ std::array<eval_type, storage_needed>
+        partial_results_array[];
+    return partial_results_array;
+  } else {
+    std::array<eval_type, storage_needed> partial_results_array;
+    return partial_results_array;
+  }
+}
+#endif // __CUDA_ARCH__
+
+template <size_t num_elems, typename T> constexpr auto make_span(T &t) {
+  if constexpr (std::is_pointer_v<std::remove_cvref_t<T>>) {
+    using elem_type = std::remove_cvref_t<decltype((*t)[0])>;
+    return std::span<elem_type, num_elems>{t->data(), num_elems};
+  } else {
+    using elem_type = std::remove_cvref_t<decltype(t[0])>;
+    return std::span<elem_type, num_elems>{t};
+  }
+}
+
 template <typename E>
   requires arith_number<E> || expr_type<E>
 consteval bool sign_guaranteed(E expr) {

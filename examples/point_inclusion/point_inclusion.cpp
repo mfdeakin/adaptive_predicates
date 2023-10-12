@@ -12,7 +12,9 @@
 
 #include "ae_adaptive_predicate_eval.hpp"
 #include "ae_fp_eval.hpp"
-#include "ae_gpu_scalar.hpp"
+#include "ae_gpu_vector.hpp"
+
+#include <simd_vec/vectorclass.h>
 
 using std::signbit;
 
@@ -28,8 +30,12 @@ constexpr bool is_cpu() { return !std::is_same_v<Kokkos::Cuda, ExecSpace>; }
 constexpr bool is_cpu() { return true; }
 #endif // KOKKOS_ENABLE_CUDA
 
+constexpr int threads = is_cpu() ? 1 : 32;
+
 using eval_type =
-    std::conditional_t<is_cpu(), real, adaptive_expr::GPUVec<real>>;
+    std::conditional_t<is_cpu(), Vec4d, adaptive_expr::GPUVec<real, threads>>;
+
+constexpr int vec_size = eval_type::size() / threads;
 
 int main(int argc, char *argv[]) {
   Kokkos::ScopeGuard kokkos(argc, argv);
@@ -40,12 +46,12 @@ int main(int argc, char *argv[]) {
 
   Kokkos::Random_XorShift64_Pool<ExecSpace> rand_gen(seed);
 
-  const int num_test_points = 1 << 18;
+  const int num_test_points = 1 << 12;
   Kokkos::View<real *> x_pos("Test Point X", num_test_points);
   Kokkos::View<real *> y_pos("Test Point Y", num_test_points);
   Kokkos::View<real *> z_pos("Test Point Z", num_test_points);
 
-  const int num_ellipsoids = 1 << 12;
+  const int num_ellipsoids = 1 << 10;
   Kokkos::View<real *> x_center("Ellipsoid X Center", num_ellipsoids);
   Kokkos::View<real *> y_center("Ellipsoid Y Center", num_ellipsoids);
   Kokkos::View<real *> z_center("Ellipsoid Z Center", num_ellipsoids);
@@ -79,58 +85,86 @@ int main(int argc, char *argv[]) {
   Kokkos::View<PointLocation **> ellipsoid_locs(
       "Ellipsoid Locations", num_ellipsoids, num_test_points);
 
-  const int vec_size = 8;
+  using MinusExprType = adaptive_expr::arith_expr<std::minus<>, real, real>;
+  using EllipseScaleExprType =
+      adaptive_expr::arith_expr<std::multiplies<>, real, MinusExprType>;
+  using EllipseTermsExprType =
+      adaptive_expr::arith_expr<std::multiplies<>, EllipseScaleExprType,
+                                EllipseScaleExprType>;
+  using ExprType = adaptive_expr::arith_expr<
+      std::minus<>,
+      adaptive_expr::arith_expr<
+          std::plus<>,
+          adaptive_expr::arith_expr<std::plus<>, EllipseTermsExprType,
+                                    EllipseTermsExprType>,
+          EllipseTermsExprType>,
+      real>;
 
+  using ScratchView = Kokkos::View<
+      eval_type * [adaptive_expr::num_partials_for_exact<ExprType>() + 8],
+      ExecSpace::scratch_memory_space, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+  fmt::println("Shared memory needed: {}", ScratchView::shmem_size(1));
+
+  constexpr int thread_range = threads * vec_size;
+  const auto policy =
+      Kokkos::TeamPolicy<>(num_ellipsoids * num_test_points / thread_range,
+                           threads)
+          .set_scratch_size(0, Kokkos::PerTeam(ScratchView::shmem_size(1)));
   Kokkos::parallel_for(
-      "FP point locations ellipsoid",
-      Kokkos::TeamPolicy<>(num_ellipsoids, Kokkos::AUTO_t{}, vec_size),
-      KOKKOS_LAMBDA(const auto &team) {
+      "FP point locations ellipsoid", policy, KOKKOS_LAMBDA(const auto &team) {
         const int i = team.league_rank();
-        const real &x_c = x_center(i);
-        const real &y_c = y_center(i);
-        const real &z_c = z_center(i);
-        const real &x_s = x_scale(i);
-        const real &y_s = y_scale(i);
-        const real &z_s = z_scale(i);
-        Kokkos::parallel_for(
-            Kokkos::TeamThreadRange(team, num_test_points / vec_size),
-            [&](const int j) {
-              Kokkos::parallel_for(
-                  Kokkos::ThreadVectorRange(team, vec_size), [&](const int k) {
-                    const real &x_p = x_pos(j * vec_size + k);
-                    const real &y_p = y_pos(j * vec_size + k);
-                    const real &z_p = z_pos(j * vec_size + k);
-                    using adaptive_expr::minus_expr;
-                    const auto x_diff = x_s * minus_expr(x_p, x_c);
-                    const auto y_diff = y_s * minus_expr(y_p, y_c);
-                    const auto z_diff = z_s * minus_expr(z_p, z_c);
-                    // This form of the expression has at most one subtraction,
-                    // as x_diff^2, y_diff^2, and z_diff^2 are all positive
-                    const auto ex =
-                        (x_diff * x_diff + y_diff * y_diff + z_diff * z_diff) -
-                        real{1};
-                    const auto [result, _] =
-                        adaptive_expr::eval_checked_fast<eval_type>(ex);
-                    const real exact =
-                        adaptive_expr::exactfp_eval<eval_type>(ex);
+        const int i_ell = i / (num_test_points / thread_range);
+        const int i_pt_offset =
+            (i % (num_test_points / thread_range)) * thread_range;
+        const real x_c = x_center(i_ell);
+        const real y_c = y_center(i_ell);
+        const real z_c = z_center(i_ell);
+        const real x_s = x_scale(i_ell);
+        const real y_s = y_scale(i_ell);
+        const real z_s = z_scale(i_ell);
+        eval_type x_p;
+        eval_type y_p;
+        eval_type z_p;
+        Kokkos::parallel_for(Kokkos::TeamVectorRange(team, thread_range),
+                             [&](const int j) {
+                               const int i_pt = i_pt_offset + j;
+                               x_p.insert(j, x_pos(i_pt));
+                               y_p.insert(j, y_pos(i_pt));
+                               z_p.insert(j, z_pos(i_pt));
+                             });
+        using adaptive_expr::minus_expr;
+        const auto x_diff = x_s * minus_expr(x_p, x_c);
+        const auto y_diff = y_s * minus_expr(y_p, y_c);
+        const auto z_diff = z_s * minus_expr(z_p, z_c);
+        // This form of the expression has at most one subtraction,
+        // as x_diff^2, y_diff^2, and z_diff^2 are all positive
+        const auto ex =
+            (x_diff * x_diff + y_diff * y_diff + z_diff * z_diff) - real{1};
+        const auto eval_results =
+            adaptive_expr::eval_checked_fast<eval_type>(ex);
+        const auto result = eval_results.first;
+        const auto exact = adaptive_expr::exactfp_eval<eval_type>(ex);
 
-                    PointLocation &loc = ellipsoid_locs(i, j * vec_size + k);
-                    using std::isnan;
-                    if (isnan(static_cast<real>(result))) {
-                      loc = PointLocation::Indeterminant;
-                    } else {
-                      if (exact != 0 && static_cast<real>(result) != 0 &&
-                          signbit(exact) != signbit(static_cast<real>(result))) {
-                        loc = PointLocation::Wrong;
-                      } else if (static_cast<real>(result) < 0.0) {
-                        loc = PointLocation::Inside;
-                      } else if (static_cast<real>(result) == 0.0) {
-                        loc = PointLocation::OnSurface;
-                      } else {
-                        loc = PointLocation::Outside;
-                      }
-                    }
-                  });
+        Kokkos::parallel_for(
+            Kokkos::TeamVectorRange(team, thread_range), [&](const int j) {
+              const int i_pt = i_pt_offset + j;
+              PointLocation &loc = ellipsoid_locs(i_ell, i_pt);
+              using std::isnan;
+              if (isnan(static_cast<real>(result[j]))) {
+                loc = PointLocation::Indeterminant;
+              } else {
+                if (exact[j] != 0 && static_cast<real>(result[j]) != 0 &&
+                    signbit(exact[j]) !=
+                        signbit(static_cast<real>(result[j]))) {
+                  loc = PointLocation::Wrong;
+                } else if (static_cast<real>(result[j]) < 0.0) {
+                  loc = PointLocation::Inside;
+                } else if (static_cast<real>(result[j]) == 0.0) {
+                  loc = PointLocation::OnSurface;
+                } else {
+                  loc = PointLocation::Outside;
+                }
+              }
             });
       });
   int num_indeterminant = 0;

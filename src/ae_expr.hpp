@@ -64,7 +64,7 @@ concept negate_expr_type =
 
 template <typename T>
   requires std::floating_point<T> || std::integral<T>
-T mul_sub(const T a, const T b, const T c) {
+constexpr T mul_sub(const T a, const T b, const T c) {
   return std::fma(a, b, -c);
 }
 
