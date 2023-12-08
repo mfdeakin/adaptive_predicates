@@ -13,24 +13,31 @@
 namespace adaptive_expr {
 
 namespace _impl {
-template <typename E_, typename eval_type>
+template <typename E_, typename eval_type, typename allocator_type_>
   requires expr_type<E_> || arith_number<E_>
 class adaptive_eval_impl;
 } // namespace _impl
 
-template <arith_number eval_type, typename E>
+template <arith_number eval_type,
+          typename allocator_type_ = std::pmr::polymorphic_allocator<eval_type>,
+          typename E>
   requires(expr_type<E> || arith_number<E>) && scalar_type<eval_type>
-eval_type adaptive_eval(E &&expr) {
+eval_type adaptive_eval(E &&expr, allocator_type_ &&mem_pool =
+                                      std::remove_cvref_t<allocator_type_>()) {
   using E_nr = std::remove_cvref_t<E>;
   if constexpr (sign_guaranteed(E_nr{})) {
     return fp_eval<eval_type>(expr);
   } else if constexpr (std::is_same_v<std::multiplies<>, typename E_nr::Op>) {
-    return adaptive_eval<eval_type>(expr.lhs()) *
-           adaptive_eval<eval_type>(expr.rhs());
+    return adaptive_eval<eval_type>(expr.lhs(),
+                                    std::forward<allocator_type_>(mem_pool)) *
+           adaptive_eval<eval_type>(expr.rhs(),
+                                    std::forward<allocator_type_>(mem_pool));
   } else {
     auto [checked_result, _] = eval_checked_fast<eval_type>(expr);
     if (std::isnan(checked_result)) {
-      return _impl::adaptive_eval_impl<E, eval_type>().eval(expr);
+      return _impl::adaptive_eval_impl<E, eval_type, allocator_type_>(
+                 std::forward<allocator_type_>(mem_pool))
+          .eval(expr);
     } else [[likely]] {
       return checked_result;
     }
@@ -39,17 +46,15 @@ eval_type adaptive_eval(E &&expr) {
 
 namespace _impl {
 
-template <typename E_, typename eval_type>
+template <typename E_, typename eval_type, typename allocator_type_>
   requires expr_type<E_> || arith_number<E_>
 class adaptive_eval_impl {
 public:
   using E = std::remove_cvref_t<E_>;
 
-  adaptive_eval_impl() : exact_storage{} {
-    if constexpr (!use_array) {
-      exact_storage.reserve(num_partials_for_exact<E>());
-    }
-  }
+  explicit adaptive_eval_impl(allocator_type_ mem_pool)
+      : exact_storage{num_partials_for_exact<E>(),
+                      std::forward<allocator_type_>(mem_pool)} {}
 
   explicit adaptive_eval_impl(const E_ &) : adaptive_eval_impl() {}
 
@@ -97,6 +102,8 @@ private:
     }
   }
 
+  // exact_eval_root computes the requested result of the (sub)expression to 1/2
+  // epsilon precision
   template <branch_token branch>
   std::pair<eval_type, eval_type> exact_eval_root(evaluatable auto &&expr) {
     using sub_expr = decltype(expr);
@@ -111,6 +118,8 @@ private:
                               std::numeric_limits<eval_type>::epsilon() / 2.0};
   }
 
+  // handle_overshoot attempts to determine the most efficient method of
+  // reducing error to levels that guarantee the correct sign
   template <branch_token branch>
   std::pair<eval_type, eval_type>
   handle_overshoot(expr_type auto &&expr, const eval_type result,
@@ -289,11 +298,7 @@ private:
 
   cache_tuple cache;
 
-  static constexpr bool use_array = num_partials_for_exact<E>() < 512;
-  std::conditional_t<use_array,
-                     std::array<eval_type, num_partials_for_exact<E>()>,
-                     std::vector<eval_type>>
-      exact_storage;
+  std::vector<eval_type, std::remove_cvref_t<allocator_type_>> exact_storage;
 };
 
 } // namespace _impl

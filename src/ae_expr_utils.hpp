@@ -336,6 +336,8 @@ consteval bool sign_guaranteed(E expr) {
   return false;
 }
 
+namespace _impl {
+
 template <typename Op> consteval std::size_t op_latency() {
   if constexpr (std::is_same_v<std::plus<>, Op> ||
                 std::is_same_v<std::minus<>, Op>) {
@@ -491,6 +493,8 @@ template <typename storage_t> struct enumerate_branches_functor {
     }
   }
 };
+
+} // namespace _impl
 
 } // namespace adaptive_expr
 
