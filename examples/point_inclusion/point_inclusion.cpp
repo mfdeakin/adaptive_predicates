@@ -28,6 +28,24 @@ constexpr bool is_cpu() { return !std::is_same_v<Kokkos::Cuda, ExecSpace>; }
 constexpr bool is_cpu() { return true; }
 #endif // KOKKOS_ENABLE_CUDA
 
+template <typename alloc_type, typename size_const> class single_alloc {
+public:
+  constexpr alloc_type *allocate(const std::size_t n) { return buffer.data(); }
+  constexpr void deallocate(void *, std::size_t) const noexcept {}
+  bool is_equal(const std::pmr::memory_resource &) const noexcept {
+    return false;
+  }
+
+  using value_type = alloc_type;
+  using size_type = std::size_t;
+  using pointer = alloc_type *;
+  using const_pointer = const alloc_type *;
+  using reference = alloc_type &;
+
+private:
+  std::array<alloc_type, size_const::value> buffer;
+};
+
 using eval_type =
     std::conditional_t<is_cpu(), real, adaptive_expr::GPUVec<real>>;
 
@@ -109,10 +127,16 @@ int main(int argc, char *argv[]) {
                     const auto ex =
                         (x_diff * x_diff + y_diff * y_diff + z_diff * z_diff) -
                         real{1};
+                    static constexpr std::size_t partial_sum_size =
+                        adaptive_expr::num_partials_for_exact<decltype(ex)>();
+
                     const auto [result, _] =
                         adaptive_expr::eval_checked_fast<eval_type>(ex);
+                    single_alloc<eval_type, std::integral_constant<
+                                                std::size_t, partial_sum_size>>
+                        mem_pool;
                     const real exact =
-                        adaptive_expr::exactfp_eval<eval_type>(ex);
+                        adaptive_expr::exactfp_eval<eval_type>(ex, mem_pool);
 
                     PointLocation &loc = ellipsoid_locs(i, j * vec_size + k);
                     using std::isnan;
@@ -120,7 +144,8 @@ int main(int argc, char *argv[]) {
                       loc = PointLocation::Indeterminant;
                     } else {
                       if (exact != 0 && static_cast<real>(result) != 0 &&
-                          signbit(exact) != signbit(static_cast<real>(result))) {
+                          signbit(exact) !=
+                              signbit(static_cast<real>(result))) {
                         loc = PointLocation::Wrong;
                       } else if (static_cast<real>(result) < 0.0) {
                         loc = PointLocation::Inside;

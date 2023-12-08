@@ -29,25 +29,38 @@ constexpr eval_type fp_eval(E_ &&e) noexcept {
   }
 }
 
-template <arith_number eval_type, typename E>
+template <arith_number eval_type,
+          typename allocator_type_ = std::pmr::polymorphic_allocator<eval_type>,
+          typename E>
   requires expr_type<E> || arith_number<E>
-constexpr eval_type exactfp_eval(E &&e) noexcept {
+constexpr eval_type
+exactfp_eval(E &&e, allocator_type_ &&mem_pool =
+                        std::remove_cvref_t<allocator_type_>()) noexcept {
   if constexpr (is_expr_v<std::remove_reference_t<E>>) {
-    auto partial_results = []() {
-      constexpr std::size_t max_stack_storage = 1024 / sizeof(eval_type);
-      constexpr std::size_t storage_needed = num_partials_for_exact<E>();
-      if constexpr (storage_needed > max_stack_storage) {
-        return std::vector<eval_type>(storage_needed);
-      } else {
-        return std::array<eval_type, storage_needed>{};
+    using allocator_type = std::remove_cvref_t<allocator_type_>;
+    constexpr std::size_t storage_needed = num_partials_for_exact<E>();
+    // Until unique_ptr with a custom deleter or vector with a custom allocator
+    // is cuda compatible, we unfortunately have to use a custom equivalent
+    class constexpr_unique {
+    public:
+      explicit constexpr constexpr_unique(allocator_type &mem_pool)
+          : mem_pool{&mem_pool}, ptr{mem_pool.allocate(storage_needed)} {}
+      constexpr_unique(constexpr_unique &) = delete;
+      constexpr ~constexpr_unique() {
+        mem_pool->deallocate(ptr, storage_needed);
       }
-    }();
-    std::span<eval_type, num_partials_for_exact<E>()> partial_span{
-        partial_results};
+      constexpr eval_type *get() const { return ptr; }
+
+    private:
+      allocator_type *mem_pool;
+      eval_type *ptr;
+    };
+    constexpr_unique partial_results_ptr{mem_pool};
+    std::span<eval_type, storage_needed> partial_span{partial_results_ptr.get(),
+                                                      storage_needed};
     _impl::exactfp_eval_impl<eval_type>(std::forward<E>(e), partial_span);
-    return _impl::merge_sum(partial_span);
-    // return std::accumulate(partial_results.begin(), partial_results.end(),
-    // eval_type(0));
+    const eval_type result = _impl::merge_sum(partial_span);
+    return result;
   } else {
     return static_cast<eval_type>(e);
   }
