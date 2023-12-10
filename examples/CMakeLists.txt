@@ -1,7 +1,9 @@
 
-find_package(Kokkos REQUIRED)
+find_package(Kokkos QUIET)
 
-option(EX_POINT_INCLUSION "Point inclusion example" ON)
-if(EX_POINT_INCLUSION)
-  add_subdirectory(point_inclusion)
+if(Kokkos_FOUND)
+  option(EX_POINT_INCLUSION "Point inclusion example" ON)
+  if(EX_POINT_INCLUSION)
+    add_subdirectory(point_inclusion)
+  endif()
 endif()

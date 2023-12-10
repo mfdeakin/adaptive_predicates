@@ -31,8 +31,6 @@ public:
   constexpr auto &lhs() const noexcept { return m_lhs; }
   constexpr auto &rhs() const noexcept { return m_rhs; }
 
-  constexpr auto &operator()() { return *this; }
-
 private:
   [[no_unique_address]] LHS m_lhs;
   [[no_unique_address]] RHS m_rhs;
@@ -141,8 +139,8 @@ constexpr auto divide_expr(LHS &&lhs, RHS &&rhs) {
                                    std::forward<RHS>(rhs));
 }
 
-template <expr_type E> constexpr auto operator-(const E &expr) {
-  return minus_expr(additive_id{}, expr);
+template <expr_type E> constexpr auto operator-(E &&expr) {
+  return minus_expr(additive_id{}, std::forward<E>(expr));
 }
 
 template <typename LHS, typename RHS>
