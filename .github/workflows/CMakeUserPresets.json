@@ -1,0 +1,160 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+      "major": 3,
+      "minor": 21,
+      "patch": 0
+    },
+    "configurePresets": [
+      {
+        "name": "ubuntu-latest",
+        "hidden": true,
+        "displayName": "Configuration settings for the Ubuntu CI host",
+        "description": "Configuration settings specific to Ubuntu",
+        "cacheVariables": {
+          "CMAKE_CXX_FLAGS": "-mfma"
+        }
+      },
+  
+      {
+        "name": "ubuntu-latest-gcc-debug",
+        "displayName": "Linux GCC Debug",
+        "inherits": [
+          "ubuntu-latest",
+          "gcc",
+          "debug",
+          "asan"
+        ],
+        "binaryDir": "${sourceDir}/cmake-build-gcc-debug-asan",
+        "installDir": "${sourceDir}/cmake-build-gcc-debug-asan/install",
+        "generator": "Ninja"
+      },
+  
+      {
+        "name": "ubuntu-latest-gcc-debug",
+        "displayName": "Linux Clang Debug",
+        "inherits": [
+          "ubuntu-latest",
+          "clang-tidy",
+          "debug",
+          "asan"
+        ],
+        "binaryDir": "${sourceDir}/cmake-build-clang-debug-asan",
+        "installDir": "${sourceDir}/cmake-build-clang-debug-asan/install",
+        "generator": "Ninja"
+      },
+  
+      {
+        "name": "gcc-release",
+        "displayName": "Linux GCC Release",
+        "inherits": [
+          "ubuntu-latest",
+          "gcc",
+          "release"
+        ],
+        "binaryDir": "${sourceDir}/cmake-build-gcc-release",
+        "installDir": "${sourceDir}/cmake-build-gcc-release/install",
+        "generator": "Ninja"
+      },
+  
+      {
+        "name": "clang-release",
+        "displayName": "Linux Clang Release",
+        "inherits": [
+          "ubuntu-latest",
+          "clang",
+          "release"
+        ],
+        "binaryDir": "${sourceDir}/cmake-build-clang-release",
+        "installDir": "${sourceDir}/cmake-build-clang-release/install",
+        "generator": "Ninja"
+      },
+  
+      {
+        "name": "gcc-release-profiling",
+        "displayName": "Linux GCC Release with Profiling",
+        "inherits": [
+          "ubuntu-latest",
+          "gcc",
+          "release",
+          "profiling"
+        ],
+        "binaryDir": "${sourceDir}/cmake-build-gcc-release-profiling",
+        "installDir": "${sourceDir}/cmake-build-gcc-release-profiling/install",
+        "generator": "Ninja"
+      },
+  
+      {
+        "name": "clang-release-profiling",
+        "displayName": "Linux Clang Release with Profiling",
+        "inherits": [
+          "ubuntu-latest",
+          "clang",
+          "release",
+          "profiling"
+        ],
+        "binaryDir": "${sourceDir}/cmake-build-clang-release-profiling",
+        "installDir": "${sourceDir}/cmake-build-clang-release-profiling/install",
+        "generator": "Ninja"
+      }
+    ],
+    
+    "buildPresets": [
+      {
+        "name": "ubuntu-latest-gcc-debug",
+        "configurePreset": "ubuntu-latest-gcc-debug"
+      },
+      {
+        "name": "ubuntu-latest-gcc-release",
+        "configurePreset": "ubuntu-latest-gcc-release"
+      },
+      {
+        "name": "ubuntu-latest-gcc-release-profiling",
+        "configurePreset": "ubuntu-latest-gcc-release-profiling"
+      },
+      {
+        "name": "ubuntu-latest-clang-debug",
+        "configurePreset": "ubuntu-latest-clang-debug"
+      },
+      {
+        "name": "ubuntu-latest-clang-release",
+        "configurePreset": "ubuntu-latest-clang-release"
+      },
+      {
+        "name": "ubuntu-latest-clang-release-profiling",
+        "configurePreset": "ubuntu-latest-clang-release-profiling"
+      }
+    ],
+      
+    "testPresets": [
+      {
+        "name": "ubuntu-latest-gcc-debug",
+        "configurePreset": "ubuntu-latest-gcc-debug",
+        "filter": {
+          "exclude": { "name": "\\[benchmark\\]" }
+        }
+      },
+      {
+        "name": "ubuntu-latest-clang-debug",
+        "configurePreset": "ubuntu-latest-clang-debug",
+        "filter": {
+          "exclude": { "name": "\\[benchmark\\]" }
+        }
+      },
+      {
+        "name": "ubuntu-latest-gcc-release",
+        "configurePreset": "ubuntu-latest-gcc-release",
+        "output": {
+          "verbosity": "verbose"
+        }
+      },
+      {
+        "name": "ubuntu-latest-clang-release",
+        "configurePreset": "ubuntu-latest-clang-release",
+        "output": {
+          "verbosity": "verbose"
+        }
+      }
+    ]
+  }
+  

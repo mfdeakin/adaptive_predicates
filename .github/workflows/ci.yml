@@ -1,0 +1,60 @@
+# CMake CI workflow
+# Based on https://github.com/actions/starter-workflows/blob/main/ci/cmake-multi-platform.yml
+name: CMake CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations.
+      # Consider changing this to true when your workflow is stable.
+      fail-fast: false
+
+      # Set up a matrix to run the following configurations:
+      # 1. <Linux, Release, latest GCC compiler toolchain on the default runner image, default generator>
+      # 2. <Linux, Release, latest Clang compiler toolchain on the default runner image, default generator>
+      #
+      # TODO: Add windows-latest with cl
+      matrix:
+        os: [ubuntu-latest]
+        build_type: [Debug, Release]
+        c_compiler: [gcc, clang]
+        include:
+          - os: ubuntu-latest
+            c_compiler: gcc
+          - os: ubuntu-latest
+            c_compiler: clang
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Catch2, CGAL, fmt, and ninja
+      run: |
+        sudo apt-get update
+        sudo apt-get install catch2 libcgal-dev libfmt-dev ninja-build
+
+    - name: Set reusable strings
+      # Set steps.strings.outputs.cmake-preset to be the preset name to use
+      id: strings
+      shell: bash
+      run: |
+        echo "cmake-preset=${{ matrix.os }}-${{ matrix.c_compiler }}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
+
+    - name: Setup the testing presets
+      run: cp ${{ github.workspace }}/.github/workflows/CMakeUserPresets.json ${{ github.workspace }}
+
+    - name: Configure CMake
+      run: cmake --preset ${{ steps.strings.outputs.cmake-preset }}
+
+    - name: Build
+      run: cmake --build --preset ${{ steps.strings.outputs.cmake-preset }}
+
+    - name: Test
+      run: ctest --preset ${{ steps.strings.outputs.cmake-preset }}
