@@ -21,7 +21,7 @@ static constexpr std::size_t y = 1;
 
 #define BENCHMARK_CASE(TEST_PREAMBLE, BENCHMARK_CALL_METHOD, name, tags,       \
                        method, points)                                         \
-  TEST_CASE(name " - [!benchmark]" tags, "[!benchmark]" tags) {                \
+  TEST_CASE(name " - [benchmark]" tags, "[benchmark]" tags) {                  \
     TEST_PREAMBLE(points)                                                      \
     BENCHMARK(name) { return BENCHMARK_CALL_METHOD(method); };                 \
   }
