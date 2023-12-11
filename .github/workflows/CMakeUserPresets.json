@@ -31,7 +31,7 @@
       },
   
       {
-        "name": "ubuntu-latest-gcc-debug",
+        "name": "ubuntu-latest-clang-debug",
         "displayName": "Linux Clang Debug",
         "inherits": [
           "ubuntu-latest",
@@ -45,7 +45,7 @@
       },
   
       {
-        "name": "gcc-release",
+        "name": "ubuntu-latest-gcc-release",
         "displayName": "Linux GCC Release",
         "inherits": [
           "ubuntu-latest",
@@ -58,7 +58,7 @@
       },
   
       {
-        "name": "clang-release",
+        "name": "ubuntu-latest-clang-release",
         "displayName": "Linux Clang Release",
         "inherits": [
           "ubuntu-latest",
@@ -71,7 +71,7 @@
       },
   
       {
-        "name": "gcc-release-profiling",
+        "name": "ubuntu-latest-gcc-release-profiling",
         "displayName": "Linux GCC Release with Profiling",
         "inherits": [
           "ubuntu-latest",
@@ -85,7 +85,7 @@
       },
   
       {
-        "name": "clang-release-profiling",
+        "name": "ubuntu-latest-clang-release-profiling",
         "displayName": "Linux Clang Release with Profiling",
         "inherits": [
           "ubuntu-latest",
