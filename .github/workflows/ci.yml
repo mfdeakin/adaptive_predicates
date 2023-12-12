@@ -38,12 +38,15 @@ jobs:
         submodules: 'true'
 
     - name: Install Catch2, CGAL, fmt, and ninja
+      # ubuntu-toolchain-r/test has a more recent gcc
+      # fenics-packages/fenics has a more recent catch2
       run: |
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
         sudo add-apt-repository ppa:fenics-packages/fenics
-        sudo add-apt-repository ppa:ubuntu-security-crossteam/ppa
         sudo apt-get update
-        sudo apt-get install gcc clang catch2 libcgal-dev libfmt-dev ninja-build
+        sudo apt-get install catch2 libcgal-dev libfmt-dev ninja-build
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        sudo apt-get update
+        sudo apt-get install gcc-13 clang
 
     - name: Set reusable strings
       # Set steps.strings.outputs.cmake-preset to be the preset name to use
