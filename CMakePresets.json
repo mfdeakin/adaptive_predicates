@@ -59,6 +59,9 @@
       "hidden": true,
       "displayName": "Debug with Clang Tidy Config",
       "description": "Debug with Clang Tidy  config",
+      "inherits": [
+        "clang"
+      ],
       "cacheVariables": {
         "CLANG_TIDY": "ON"
       }

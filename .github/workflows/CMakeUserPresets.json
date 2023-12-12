@@ -7,6 +7,17 @@
     },
     "configurePresets": [
       {
+        "name": "gcc-13",
+        "hidden": true,
+        "displayName": "gcc-13 Config",
+        "description": "gcc-13 config",
+        "cacheVariables": {
+          "CMAKE_C_COMPILER": "gcc-13",
+          "CMAKE_CXX_COMPILER": "g++-13"
+        }
+      },
+
+      {
         "name": "ubuntu-latest",
         "hidden": true,
         "displayName": "Configuration settings for the Ubuntu CI host",
@@ -21,7 +32,7 @@
         "displayName": "Linux GCC Debug",
         "inherits": [
           "ubuntu-latest",
-          "gcc",
+          "gcc-13",
           "debug",
           "asan"
         ],
@@ -49,7 +60,7 @@
         "displayName": "Linux GCC Release",
         "inherits": [
           "ubuntu-latest",
-          "gcc",
+          "gcc-13",
           "release"
         ],
         "binaryDir": "${sourceDir}/cmake-build-gcc-release",
@@ -75,7 +86,7 @@
         "displayName": "Linux GCC Release with Profiling",
         "inherits": [
           "ubuntu-latest",
-          "gcc",
+          "gcc-13",
           "release",
           "profiling"
         ],
