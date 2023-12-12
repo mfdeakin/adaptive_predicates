@@ -29,8 +29,10 @@ jobs:
         include:
           - os: ubuntu-latest
             c_compiler: gcc-13
+            cpp_compiler: g++-13
           - os: ubuntu-latest
             c_compiler: clang-17
+            cpp_compiler: clang++-17
 
     steps:
     - uses: actions/checkout@v4
@@ -42,18 +44,23 @@ jobs:
       id: strings
       shell: bash
       run: |
-        export base_compiler=$(echo ${{ matrix.c_compiler }} | cut -d'-' -f1)
-        echo "base-compiler=${base_compiler}" >> "$GITHUB_OUTPUT"
+        export base_c_compiler=$(echo ${{ matrix.c_compiler }} | cut -d'-' -f1)
+        export base_cpp_compiler=$(echo ${{ matrix.cpp_compiler }} | cut -d'-' -f1)
+        echo "base-c-compiler=${base_compiler}" >> "$GITHUB_OUTPUT"
+        echo "base-cpp-compiler=${base_compiler}" >> "$GITHUB_OUTPUT"
         echo "cmake-preset=${{ matrix.os }}-${base_compiler}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
 
     - name: Install the compiler
       # Installs the requested compiler; ensure that the preset uses the newly installed compiler
+      # We need to get the key so the ci machine trusts llvm's repository
       run: |
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-        sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+        sudo bash -c 'wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc'
+        sudo add-apt-repository 'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main'
         sudo apt-get update
         sudo apt-get install ${{ matrix.c_compiler }}
-        sudo ln -fs $(which ${{ matrix.c_compiler }}) $(which ${{ steps.strings.outputs.base-compiler }})
+        sudo ln -fs $(which ${{ matrix.c_compiler }}) $(which ${{ steps.strings.outputs.base-c-compiler }})
+        sudo ln -fs $(which ${{ matrix.cpp_compiler }}) $(which ${{ steps.strings.outputs.base-cpp-compiler }})
 
     - name: Install Catch2, CGAL, fmt, and ninja
       # fenics-packages/fenics has a more recent catch2
