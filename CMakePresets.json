@@ -58,7 +58,7 @@
       "name": "clang-tidy",
       "hidden": true,
       "displayName": "Debug with Clang Tidy Config",
-      "description": "Debug with Clang Tidy  config",
+      "description": "Debug with Clang Tidy Config",
       "inherits": [
         "clang"
       ],

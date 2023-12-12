@@ -35,7 +35,7 @@
         "displayName": "Linux Clang Debug",
         "inherits": [
           "ubuntu-latest",
-          "clang-tidy",
+          "clang",
           "debug",
           "asan"
         ],
