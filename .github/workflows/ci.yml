@@ -25,14 +25,14 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         build_type: [debug, release]
-        c_compiler: [gcc-13, clang-17]
+        c_compiler: [gcc-13, clang-18]
         include:
           - os: ubuntu-latest
             c_compiler: gcc-13
             cpp_compiler: g++-13
           - os: ubuntu-latest
-            c_compiler: clang-17
-            cpp_compiler: clang++-17
+            c_compiler: clang-18
+            cpp_compiler: clang++-18
 
     steps:
     - uses: actions/checkout@v4
@@ -46,9 +46,9 @@ jobs:
       run: |
         export base_c_compiler=$(echo ${{ matrix.c_compiler }} | cut -d'-' -f1)
         export base_cpp_compiler=$(echo ${{ matrix.cpp_compiler }} | cut -d'-' -f1)
-        echo "base-c-compiler=${base_compiler}" >> "$GITHUB_OUTPUT"
-        echo "base-cpp-compiler=${base_compiler}" >> "$GITHUB_OUTPUT"
-        echo "cmake-preset=${{ matrix.os }}-${base_compiler}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
+        echo "base-c-compiler=${base_c_compiler}" >> "$GITHUB_OUTPUT"
+        echo "base-cpp-compiler=${base_cpp_compiler}" >> "$GITHUB_OUTPUT"
+        echo "cmake-preset=${{ matrix.os }}-${base_c_compiler}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
 
     - name: Install the compiler
       # Installs the requested compiler; ensure that the preset uses the newly installed compiler
