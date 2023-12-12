@@ -1,0 +1,82 @@
+# CMake CI workflow
+# Based on https://github.com/actions/starter-workflows/blob/main/ci/cmake-multi-platform.yml
+name: CMake CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Set fail-fast to false to ensure that feedback is delivered for all matrix combinations.
+      # Consider changing this to true when your workflow is stable.
+      fail-fast: false
+
+      # Set up a matrix to run the following configurations:
+      # 1. <Linux, Release, latest GCC compiler toolchain on the default runner image, default generator>
+      # 2. <Linux, Release, latest Clang compiler toolchain on the default runner image, default generator>
+      #
+      # TODO: Add windows-latest with cl
+      matrix:
+        os: [ubuntu-latest]
+        build_type: [debug, release]
+        c_compiler: [gcc-13, clang-18]
+        include:
+          - os: ubuntu-latest
+            c_compiler: gcc-13
+            cpp_compiler: g++-13
+          - os: ubuntu-latest
+            c_compiler: clang-18
+            cpp_compiler: clang++-18
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+
+    - name: Set reusable strings
+      # Set steps.strings.outputs.cmake-preset to be the preset name to use
+      id: strings
+      shell: bash
+      run: |
+        export base_c_compiler=$(echo ${{ matrix.c_compiler }} | cut -d'-' -f1)
+        export base_cpp_compiler=$(echo ${{ matrix.cpp_compiler }} | cut -d'-' -f1)
+        echo "base-c-compiler=${base_c_compiler}" >> "$GITHUB_OUTPUT"
+        echo "base-cpp-compiler=${base_cpp_compiler}" >> "$GITHUB_OUTPUT"
+        echo "cmake-preset=${{ matrix.os }}-${base_c_compiler}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
+
+    - name: Install the compiler
+      # Installs the requested compiler; ensure that the preset uses the newly installed compiler
+      # We need to get the key so the ci machine trusts llvm's repository
+      run: |
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        sudo bash -c 'wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc'
+        sudo add-apt-repository 'deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main'
+        sudo apt-get update
+        sudo apt-get install ${{ matrix.c_compiler }}
+        sudo ln -fs $(which ${{ matrix.c_compiler }}) $(which ${{ steps.strings.outputs.base-c-compiler }})
+        sudo ln -fs $(which ${{ matrix.cpp_compiler }}) $(which ${{ steps.strings.outputs.base-cpp-compiler }})
+
+    - name: Install Catch2, CGAL, fmt, and ninja
+      # fenics-packages/fenics has a more recent catch2
+      run: |
+        sudo add-apt-repository ppa:fenics-packages/fenics
+        sudo apt-get update
+        sudo apt-get install catch2 libcgal-dev libfmt-dev ninja-build
+
+    - name: Setup the testing presets
+      run: cp ${{ github.workspace }}/.github/workflows/CMakeUserPresets.json ${{ github.workspace }}
+
+    - name: Configure CMake
+      run: cmake --preset ${{ steps.strings.outputs.cmake-preset }}
+
+    - name: Build
+      run: cmake --build --preset ${{ steps.strings.outputs.cmake-preset }}
+
+    - name: Test
+      run: ctest --preset ${{ steps.strings.outputs.cmake-preset }}
