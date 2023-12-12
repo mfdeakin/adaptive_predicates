@@ -41,6 +41,7 @@ jobs:
       run: |
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test
         sudo add-apt-repository ppa:fenics-packages/fenics
+        sudo add-apt-repository ppa:ubuntu-security-crossteam/ppa
         sudo apt-get update
         sudo apt-get install gcc clang catch2 libcgal-dev libfmt-dev ninja-build
 
