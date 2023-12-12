@@ -25,35 +25,42 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         build_type: [debug, release]
-        c_compiler: [gcc, clang]
+        c_compiler: [gcc-13, clang-17]
         include:
           - os: ubuntu-latest
-            c_compiler: gcc
+            c_compiler: gcc-13
           - os: ubuntu-latest
-            c_compiler: clang
+            c_compiler: clang-17
 
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: 'true'
 
-    - name: Install Catch2, CGAL, fmt, and ninja
-      # ubuntu-toolchain-r/test has a more recent gcc
-      # fenics-packages/fenics has a more recent catch2
-      run: |
-        sudo add-apt-repository ppa:fenics-packages/fenics
-        sudo apt-get update
-        sudo apt-get install catch2 libcgal-dev libfmt-dev ninja-build
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-        sudo apt-get update
-        sudo apt-get install gcc-13 clang
-
     - name: Set reusable strings
       # Set steps.strings.outputs.cmake-preset to be the preset name to use
       id: strings
       shell: bash
       run: |
-        echo "cmake-preset=${{ matrix.os }}-${{ matrix.c_compiler }}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
+        export base_compiler=$(echo ${{ matrix.c_compiler }} | cut -d'-' -f1)
+        echo "base-compiler=${base_compiler}" >> "$GITHUB_OUTPUT"
+        echo "cmake-preset=${{ matrix.os }}-${base_compiler}-${{ matrix.build_type }}" >> "$GITHUB_OUTPUT"
+
+    - name: Install the compiler
+      # Installs the requested compiler; ensure that the preset uses the newly installed compiler
+      run: |
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+        sudo apt-get update
+        sudo apt-get install ${{ matrix.c_compiler }}
+        sudo ln -fs $(which ${{ matrix.c_compiler }}) $(which ${{ steps.strings.outputs.base-compiler }})
+
+    - name: Install Catch2, CGAL, fmt, and ninja
+      # fenics-packages/fenics has a more recent catch2
+      run: |
+        sudo add-apt-repository ppa:fenics-packages/fenics
+        sudo apt-get update
+        sudo apt-get install catch2 libcgal-dev libfmt-dev ninja-build
 
     - name: Setup the testing presets
       run: cp ${{ github.workspace }}/.github/workflows/CMakeUserPresets.json ${{ github.workspace }}
