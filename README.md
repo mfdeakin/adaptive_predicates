@@ -32,14 +32,16 @@ and provides 2 methods:
 * `lhs`: Returns the expression (or number) on the left hand side of the operator
 * `rhs`: Returns the expression (or number) on the right hand side of the operator
 
-This computes exactly by representing intermediate results as a finite series
-For example, 435.75 might be represented as (430.0 + 5.0 + 0.75), or as (195.0 - 200.0 + 195.0 + 200.75 - 55.0)
-Then, results are computed exactly by appending the necessary values to the series
-Addition and subtraction are straight-forward, they just append the operand to the series
+This computes exactly by representing intermediate results as a finite series.
+For example, 435.75 might be represented as (430.0 + 5.0 + 0.75), or as (195.0 - 200.0 + 195.0 + 200.75 - 55.0).
+Then, results are computed exactly by appending the necessary values to the series.
+Addition and subtraction are straight-forward, they just append the operand to the series.
 Multiplication computes the exact product of every pair in the two series being multiplied and creates a new series from the result.
 For example, (30.0 + 2.0) * (10.0 + 0.5) = (30.0 * 10.0 + 30.0 * 0.5 + 2.0 * 10.0 + 2.0 * 0.5),
 which might expand to (300.0 + 10.0 + 5.0 + 20.0 + 1.0).
 Division can't currently be computed exactly; but todo in the future, it will be handled by rewriting the expression in terms of multiplications.
+Todo in the future, square-roots will be handled with the repeated squaring method; rewriting
+(a + sqrt(b)) as (a - sqrt(b)) * (a + sqrt(b)) / (a - sqrt(b)) = (a * a - b) / (a - sqrt(b)).
 
 There are three concepts that are important to this library:
 * `arith_number`: Any data-type that has `+`, `-`, `*`, operators and functions `abs` and `mul_sub`.

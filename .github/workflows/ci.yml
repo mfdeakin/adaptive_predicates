@@ -62,12 +62,12 @@ jobs:
         sudo ln -fs $(which ${{ matrix.c_compiler }}) $(which ${{ steps.strings.outputs.base-c-compiler }})
         sudo ln -fs $(which ${{ matrix.cpp_compiler }}) $(which ${{ steps.strings.outputs.base-cpp-compiler }})
 
-    - name: Install Catch2, CGAL, fmt, and ninja
+    - name: Install lcov, Catch2, CGAL, fmt, and ninja
       # fenics-packages/fenics has a more recent catch2
       run: |
         sudo add-apt-repository ppa:fenics-packages/fenics
         sudo apt-get update
-        sudo apt-get install catch2 libcgal-dev libfmt-dev ninja-build
+        sudo apt-get install lcov catch2 libcgal-dev libfmt-dev ninja-build
 
     - name: Setup the testing presets
       run: cp ${{ github.workspace }}/.github/workflows/CMakeUserPresets.json ${{ github.workspace }}
@@ -81,11 +81,13 @@ jobs:
     - name: Test
       run: ctest --preset ${{ steps.strings.outputs.cmake-preset }}
 
-    - uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        name: codecov
-        fail_ci_if_error: false
-        verbose: true
-        gcov: true
-        files: ./build/tests/CMakeFiles/tests.dir/test_adaptive_expr.cpp.gcda,./build/tests/CMakeFiles/test_matrix.dir/test_matrix.cpp.gcda
+    - name: Upload coverage results to codecov
+      run: |
+        if [ "${{ steps.strings.outputs.cmake-preset }}" == 'ubuntu-latest-gcc-debug' ]; then
+        sudo ln -fs $(which gcov-13) $(which gcov)
+        lcov --directory . --capture --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' --output-file coverage.info
+        lcov --remove coverage.info 'extern/*' --output-file coverage.info
+        lcov --list coverage.info
+        bash <(curl -s https://codecov.io/bash) || echo "Codecov did not collect coverage reports"
+        fi
