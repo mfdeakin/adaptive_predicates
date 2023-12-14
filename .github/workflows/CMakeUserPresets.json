@@ -25,8 +25,8 @@
           "debug",
           "asan"
         ],
-        "binaryDir": "${sourceDir}/cmake-build-gcc-debug-asan",
-        "installDir": "${sourceDir}/cmake-build-gcc-debug-asan/install",
+        "binaryDir": "${sourceDir}/build",
+        "installDir": "${sourceDir}/build/install",
         "generator": "Ninja"
       },
   
@@ -39,8 +39,8 @@
           "debug",
           "asan"
         ],
-        "binaryDir": "${sourceDir}/cmake-build-clang-debug-asan",
-        "installDir": "${sourceDir}/cmake-build-clang-debug-asan/install",
+        "binaryDir": "${sourceDir}/build",
+        "installDir": "${sourceDir}/build/install",
         "generator": "Ninja"
       },
   
@@ -52,8 +52,8 @@
           "gcc",
           "release"
         ],
-        "binaryDir": "${sourceDir}/cmake-build-gcc-release",
-        "installDir": "${sourceDir}/cmake-build-gcc-release/install",
+        "binaryDir": "${sourceDir}/build",
+        "installDir": "${sourceDir}/build/install",
         "generator": "Ninja"
       },
   
@@ -65,8 +65,8 @@
           "clang",
           "release"
         ],
-        "binaryDir": "${sourceDir}/cmake-build-clang-release",
-        "installDir": "${sourceDir}/cmake-build-clang-release/install",
+        "binaryDir": "${sourceDir}/build",
+        "installDir": "${sourceDir}/build/install",
         "generator": "Ninja"
       },
   
@@ -79,8 +79,8 @@
           "release",
           "profiling"
         ],
-        "binaryDir": "${sourceDir}/cmake-build-gcc-release-profiling",
-        "installDir": "${sourceDir}/cmake-build-gcc-release-profiling/install",
+        "binaryDir": "${sourceDir}/build",
+        "installDir": "${sourceDir}/build/install",
         "generator": "Ninja"
       },
   
@@ -93,8 +93,8 @@
           "release",
           "profiling"
         ],
-        "binaryDir": "${sourceDir}/cmake-build-clang-release-profiling",
-        "installDir": "${sourceDir}/cmake-build-clang-release-profiling/install",
+        "binaryDir": "${sourceDir}/build",
+        "installDir": "${sourceDir}/build/install",
         "generator": "Ninja"
       }
     ],
@@ -146,6 +146,9 @@
         "configurePreset": "ubuntu-latest-gcc-release",
         "output": {
           "verbosity": "verbose"
+        },
+        "filter": {
+          "exclude": { "name": "\\[benchmark\\]" }
         }
       },
       {
@@ -153,8 +156,10 @@
         "configurePreset": "ubuntu-latest-clang-release",
         "output": {
           "verbosity": "verbose"
+        },
+        "filter": {
+          "exclude": { "name": "\\[benchmark\\]" }
         }
       }
     ]
-  }
-  
+}
