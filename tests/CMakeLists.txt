@@ -17,7 +17,9 @@ endif()
 
 add_executable(tests test_adaptive_expr.cpp)
 target_compile_features(tests PRIVATE cxx_std_23)
+target_compile_options(tests PRIVATE -fprofile-arcs -ftest-coverage)
 target_link_libraries(tests PRIVATE adaptive_predicates shewchuk Catch2::Catch2WithMain)
+target_link_options(tests PRIVATE -fprofile-arcs -ftest-coverage)
 target_include_directories(tests PRIVATE ${CMAKE_SOURCE_DIR}/extern ${CMAKE_SOURCE_DIR}/extern/simd_vec)
 
 # CGAL adds -frounding-math for GCC, but that breaks our tests,
@@ -30,7 +32,9 @@ catch_discover_tests(tests)
 
 add_executable(test_matrix test_matrix.cpp)
 target_compile_features(test_matrix PRIVATE cxx_std_23)
+target_compile_options(test_matrix PRIVATE -fprofile-arcs -ftest-coverage)
 target_link_libraries(test_matrix PRIVATE adaptive_predicates Catch2::Catch2WithMain fmt::fmt)
+target_link_options(test_matrix PRIVATE -fprofile-arcs -ftest-coverage)
 target_include_directories(test_matrix PRIVATE ${CMAKE_SOURCE_DIR}/extern)
 catch_discover_tests(test_matrix)
 
