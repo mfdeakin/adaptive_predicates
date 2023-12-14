@@ -1,3 +1,6 @@
+![continuous_integration](https://github.com/mfdeakin/adaptive_predicates/actions/workflows/ci.yml/badge.svg)
+[![codecov](https://codecov.io/gh/mfdeakin/adaptive_predicates/graph/badge.svg?token=UA3EIF20MK)](https://codecov.io/gh/mfdeakin/adaptive_predicates)
+
 An implementation of exactly evaluated floating point predicates for arbitrary expressions composed of additions and multiplications.
 
 This provides an expression template system for representing arbitrary expressions at compile-time,
