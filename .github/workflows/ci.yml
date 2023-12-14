@@ -80,3 +80,12 @@ jobs:
 
     - name: Test
       run: ctest --preset ${{ steps.strings.outputs.cmake-preset }}
+
+    - uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./build/tests/CMakeFiles/tests.dir/test_adaptive_expr.cpp.gcda ./build/tests/CMakeFiles/test_matrix.dir/test_matrix.cpp.gcda
+        name: codeco
+        fail_ci_if_error: true
+        verbose: true
+        gcov: true
