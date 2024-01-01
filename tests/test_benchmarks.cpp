@@ -60,7 +60,7 @@ static constexpr std::size_t y = 1;
                  points)
 
 #define AE_ORIENT2D_PREAMBLE(points)                                           \
-  const auto expression = build_orient2d_case(points);
+  const auto expression = pt_orient_expr(points);
 
 #define AE_ORIENT2D_CALL_METHOD(method) method(expression)
 

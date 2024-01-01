@@ -9,6 +9,7 @@
 #include "ae_expr.hpp"
 #include "ae_fp_eval.hpp"
 
+#include "ae_geom_exprs.hpp"
 #include "double_testing_data.hpp"
 #include "testing_utils.hpp"
 
@@ -235,7 +236,7 @@ TEST_CASE("adaptive_construction", "[eval_checked_fast_functor]") {
       eval_checked_fast<real>((arith_expr{} + 7.0) * 2.0 - 14.0).first));
 
   for (auto [points, expected] : orient2d_cases) {
-    const auto e = build_orient2d_case(points);
+    const auto e = pt_orient_expr(points);
     const auto result = eval_checked_fast<real>(e).first;
     CHECK((std::isnan(result) || check_sign(expected, result)));
   }
@@ -249,7 +250,7 @@ TEST_CASE("adaptive_construction", "[eval_with_err_functor]") {
       std::isnan(eval_with_err<real>((arith_expr{} + 7.0) * 2.0 - 14.0).first));
 
   for (auto [points, expected] : orient2d_cases) {
-    const auto e = build_orient2d_case(points);
+    const auto e = pt_orient_expr(points);
     const auto result = eval_with_err<real>(e).first;
     CHECK((std::isnan(result) || check_sign(expected, result)));
   }
@@ -262,7 +263,7 @@ TEST_CASE("adaptive_construction", "[exact_eval_functor]") {
   REQUIRE(exactfp_eval<real>((arith_expr{} + 7.0) * 2.0 - 14.0) == 0.0);
 
   for (auto [points, expected] : orient2d_cases) {
-    const auto e = build_orient2d_case(points);
+    const auto e = pt_orient_expr(points);
     CHECK(check_sign(expected, exactfp_eval<real>(e)));
   }
 }
@@ -274,7 +275,7 @@ TEST_CASE("adaptive_construction", "[adaptive_eval_functor]") {
   REQUIRE(adaptive_eval<real>((arith_expr{} + 7.0) * 2.0 - 14.0) == 0.0);
 
   for (auto [points, expected] : orient2d_cases) {
-    const auto e = build_orient2d_case(points);
+    const auto e = adaptive_expr::pt_orient_expr(points);
     CHECK(check_sign(expected, adaptive_eval<real>(e)));
   }
 }
@@ -360,7 +361,7 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
 
   const auto points = orient2d_cases[0].first;
   const auto expected = orient2d_cases[0].second;
-  const auto expr = build_orient2d_case(points);
+  const auto expr = adaptive_expr::pt_orient_expr(points);
   REQUIRE(correct_eval<real>(expr));
   REQUIRE(check_sign(*correct_eval<real>(expr), expected));
   REQUIRE(!std::isnan(eval_with_err<real>(expr).first));

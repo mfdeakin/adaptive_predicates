@@ -9,6 +9,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "ae_adaptive_predicate_eval.hpp"
+#include "ae_geom_exprs.hpp"
 
 #include "testing_utils.hpp"
 
