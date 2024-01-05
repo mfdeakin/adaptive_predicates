@@ -1,7 +1,4 @@
 
-add_compile_options("-g")
-add_link_options("-g")
-
 option(ENABLE_PROFILING "Produce metadata for profiling the resulting binaries" ON)
 if(ENABLE_PROFLING)
   add_compile_options("-fprofile-generate")
