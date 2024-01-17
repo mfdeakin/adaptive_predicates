@@ -347,6 +347,19 @@ consteval bool sign_guaranteed(E expr) {
 
 namespace _impl {
 
+
+constexpr std::size_t left_branch_id(const std::size_t branch_id) {
+  return branch_id + 1;
+}
+
+template <evaluatable expr_t>
+constexpr std::size_t right_branch_id(const std::size_t branch_id) {
+  // Note that if asked, this will tell you that a left leaf node has the same
+  // id as its right sibiling.
+  // We don't use this id for leaf nodes, so it's not an issue here
+  return branch_id + num_internal_nodes<typename expr_t::LHS>() + 1;
+}
+
 template <typename Op> consteval std::size_t op_latency() {
   if constexpr (std::is_same_v<std::plus<>, Op> ||
                 std::is_same_v<std::minus<>, Op>) {
