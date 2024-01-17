@@ -18,9 +18,6 @@
 
 using namespace adaptive_expr;
 
-static constexpr std::size_t x = 0;
-static constexpr std::size_t y = 1;
-
 #define BENCHMARK_CASE(TEST_PREAMBLE, BENCHMARK_CALL_METHOD, name, tags,       \
                        method, points)                                         \
   TEST_CASE(name " - [benchmark]" tags, "[benchmark]" tags) {                  \
@@ -29,6 +26,9 @@ static constexpr std::size_t y = 1;
   }
 
 #ifdef HAS_CGAL
+static constexpr std::size_t x = 0;
+static constexpr std::size_t y = 1;
+
 #define CGAL_PREAMBLE(points)                                                  \
   CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt0(   \
       points[0][x], points[0][y]);                                             \
