@@ -12,7 +12,8 @@
         "displayName": "Configuration settings for the Ubuntu CI host",
         "description": "Configuration settings specific to Ubuntu",
         "cacheVariables": {
-          "CMAKE_CXX_FLAGS": "-mfma"
+          "CMAKE_CXX_FLAGS": "-mfma",
+          "BENCHMARK_CGAL": "ON"
         }
       },
   

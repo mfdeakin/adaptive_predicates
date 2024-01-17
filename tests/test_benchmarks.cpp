@@ -8,8 +8,10 @@
 
 #include "shewchuk.h"
 
+#ifdef HAS_CGAL
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Point_2.h>
+#endif // HAS_CGAL
 
 #include "double_testing_data.hpp"
 #include "testing_utils.hpp"
@@ -26,6 +28,7 @@ static constexpr std::size_t y = 1;
     BENCHMARK(name) { return BENCHMARK_CALL_METHOD(method); };                 \
   }
 
+#ifdef HAS_CGAL
 #define CGAL_PREAMBLE(points)                                                  \
   CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt0(   \
       points[0][x], points[0][y]);                                             \
@@ -39,6 +42,9 @@ static constexpr std::size_t y = 1;
 #define CGAL_ORIENT2D_CASE(name, tags, points)                                 \
   BENCHMARK_CASE(CGAL_PREAMBLE, CGAL_ORIENT2D_CALL_METHOD, name,               \
                  "[cgal][orient2d]" tags, CGAL::orientation, points)
+#else // HAS_CGAL
+#define CGAL_ORIENT2D_CASE(name, tags, points)
+#endif // HAS_CGAL
 
 #define SHEWCHUK_ORIENT2D_PREAMBLE(points)                                     \
   Shewchuk::exactinit();                                                       \
