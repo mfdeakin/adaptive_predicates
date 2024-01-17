@@ -27,11 +27,13 @@ eval_type adaptive_eval(E &&expr, allocator_type_ &&mem_pool =
   using E_nr = std::remove_cvref_t<E>;
   if constexpr (sign_guaranteed(E_nr{})) {
     return fp_eval<eval_type>(expr);
-  } else if constexpr (std::is_same_v<std::multiplies<>, typename E_nr::Op>) {
-    return adaptive_eval<eval_type>(expr.lhs(),
-                                    std::forward<allocator_type_>(mem_pool)) *
-           adaptive_eval<eval_type>(expr.rhs(),
-                                    std::forward<allocator_type_>(mem_pool));
+  } else if constexpr (std::is_same_v<std::multiplies<>, typename E_nr::Op> ||
+                       std::is_same_v<std::divides<>, typename E_nr::Op>) {
+    return (typename E_nr::Op){}(
+        adaptive_eval<eval_type>(expr.lhs(),
+                                 std::forward<allocator_type_>(mem_pool)),
+        adaptive_eval<eval_type>(expr.rhs(),
+                                 std::forward<allocator_type_>(mem_pool)));
   } else {
     auto [checked_result, _] = eval_checked_fast<eval_type>(expr);
     if (std::isnan(checked_result)) {
