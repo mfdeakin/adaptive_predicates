@@ -227,49 +227,6 @@ static_assert(num_partials_for_exact<decltype(arith_expr{} + 4 - 7)>() == 2);
 static_assert(num_partials_for_exact<decltype((arith_expr{} + 4 - 7) * 5)>() ==
               4);
 
-// enumerate_branches_functor
-struct branch_token_tag : public branch_token_s {
-  template <template <class> class branch_dir>
-  using append_branch = branch_dir<branch_token_tag>;
-};
-
-static_assert(
-    std::is_same_v<std::invoke_result_t<
-                       enumerate_branches_functor<branch_token_tag>, float>,
-                   std::tuple<>>);
-static_assert(std::is_same_v<
-              std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
-                                   arith_expr<std::plus<>, real, real>>,
-              std::tuple<branch_token_tag>>);
-static_assert(std::is_same_v<
-              std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
-                                   decltype(arith_expr{})>,
-              std::tuple<branch_token_tag>>);
-static_assert(
-    std::is_same_v<
-        std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
-                             decltype(arith_expr{} + 1)>,
-        std::tuple<branch_token_tag, branch_token_left<branch_token_tag>>>);
-static_assert(
-    std::is_same_v<
-        std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
-                             decltype(1 + arith_expr{})>,
-        std::tuple<branch_token_tag, branch_token_right<branch_token_tag>>>);
-static_assert(std::is_same_v<
-              std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
-                                   decltype(arith_expr{} + arith_expr{})>,
-              std::tuple<branch_token_tag, branch_token_left<branch_token_tag>,
-                         branch_token_right<branch_token_tag>>>);
-static_assert(
-    std::is_same_v<
-        std::invoke_result_t<enumerate_branches_functor<branch_token_tag>,
-                             decltype((arith_expr{} + arith_expr{}) +
-                                      arith_expr{})>,
-        std::tuple<branch_token_tag, branch_token_left<branch_token_tag>,
-                   branch_token_left<branch_token_left<branch_token_tag>>,
-                   branch_token_left<branch_token_right<branch_token_tag>>,
-                   branch_token_right<branch_token_tag>>>);
-
 TEST_CASE("adaptive_construction", "[eval_checked_fast_functor]") {
   REQUIRE(eval_checked_fast<real>(arith_expr{}).first == 0.0);
   REQUIRE(eval_checked_fast<real>(arith_expr{} + 7.0).first == 7.0);

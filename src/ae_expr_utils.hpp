@@ -186,6 +186,15 @@ template <typename E> constexpr std::size_t depth(E &&e) {
   }
 }
 
+template <typename E> constexpr std::size_t num_internal_nodes() {
+  if constexpr (is_expr_v<E>) {
+    return num_internal_nodes<typename E::LHS>() +
+           num_internal_nodes<typename E::RHS>() + 1;
+  } else {
+    return 0;
+  }
+}
+
 template <typename param, typename... tail> struct contains {
   static constexpr bool value = (std::is_same_v<param, tail> || ...);
 };
@@ -430,86 +439,6 @@ private:
   allocator_type *mem_pool;
   std::size_t storage_needed;
   eval_type *ptr;
-};
-
-class branch_token_s {};
-
-template <typename S>
-concept branch_token = std::is_base_of_v<branch_token_s, S>;
-
-template <typename S>
-concept branch_token_inner_node = branch_token<S> && requires(S s) { s.get(); };
-
-template <branch_token S_>
-class branch_token_inner_node_s : public branch_token_s {
-public:
-  using S = S_;
-
-  branch_token_inner_node_s() : s{} {}
-  branch_token_inner_node_s(S _s) : s{_s} {}
-  constexpr auto &get() { return s.get(); }
-
-private:
-  S s;
-};
-
-template <branch_token S>
-class branch_token_left : public branch_token_inner_node_s<S> {
-public:
-  branch_token_left() : branch_token_inner_node_s<S>{} {}
-  branch_token_left(S _s) : branch_token_inner_node_s<S>{_s} {}
-
-  static constexpr bool is_left() { return true; }
-  static constexpr bool is_right() { return false; }
-
-  template <template <class> class branch_dir>
-  using append_branch =
-      branch_token_left<typename S::template append_branch<branch_dir>>;
-};
-
-template <branch_token S>
-class branch_token_right : public branch_token_inner_node_s<S> {
-public:
-  branch_token_right() : branch_token_inner_node_s<S>{} {}
-  branch_token_right(S _s) : branch_token_inner_node_s<S>{_s} {}
-
-  static constexpr bool is_left() { return false; }
-  static constexpr bool is_right() { return true; }
-
-  template <template <class> class branch_dir>
-  using append_branch =
-      branch_token_right<typename S::template append_branch<branch_dir>>;
-};
-
-template <typename storage_t> struct apply_strings {
-  template <typename... L, typename... R>
-  auto operator()(std::tuple<L...>, std::tuple<R...>) {
-    if constexpr (sizeof...(L) > 0 && sizeof...(R) > 0) {
-      return std::tuple<storage_t, branch_token_left<L>...,
-                        branch_token_right<R>...>{};
-    } else if constexpr (sizeof...(L) > 0) {
-      return std::tuple<storage_t, branch_token_left<L>...>{};
-    } else if constexpr (sizeof...(R) > 0) {
-      return std::tuple<storage_t, branch_token_right<R>...>{};
-    } else {
-      return std::tuple<storage_t>{};
-    }
-  }
-};
-
-template <typename storage_t> struct enumerate_branches_functor {
-  template <typename E_> constexpr auto operator()(E_ &&e) {
-    using E = std::remove_cvref_t<E_>;
-    if constexpr (is_expr_v<E>) {
-      if constexpr (is_expr_v<typename E::LHS> || is_expr_v<typename E::RHS>) {
-        return apply_strings<storage_t>{}((*this)(e.lhs()), (*this)(e.rhs()));
-      } else {
-        return std::tuple<storage_t>{};
-      }
-    } else {
-      return std::tuple<>{};
-    }
-  }
 };
 
 } // namespace _impl
