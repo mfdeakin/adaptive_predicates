@@ -414,6 +414,24 @@ template <typename E_> consteval std::size_t exact_fp_rounding_latency() {
   }
 }
 
+// Until unique_ptr with a custom deleter or vector with a custom allocator
+// is cuda compatible, we unfortunately have to use a custom equivalent
+template <typename eval_type, typename allocator_type> class constexpr_unique {
+public:
+  explicit constexpr constexpr_unique(allocator_type &mem_pool,
+                                      std::size_t storage_needed)
+      : mem_pool{&mem_pool}, storage_needed{storage_needed},
+        ptr{mem_pool.allocate(storage_needed)} {}
+  constexpr_unique(constexpr_unique &) = delete;
+  constexpr ~constexpr_unique() { mem_pool->deallocate(ptr, storage_needed); }
+  constexpr eval_type *get() const { return ptr; }
+
+private:
+  allocator_type *mem_pool;
+  std::size_t storage_needed;
+  eval_type *ptr;
+};
+
 class branch_token_s {};
 
 template <typename S>

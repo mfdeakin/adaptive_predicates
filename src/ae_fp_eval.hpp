@@ -39,23 +39,9 @@ exactfp_eval(E &&e, allocator_type_ &&mem_pool =
   if constexpr (is_expr_v<std::remove_reference_t<E>>) {
     using allocator_type = std::remove_cvref_t<allocator_type_>;
     constexpr std::size_t storage_needed = num_partials_for_exact<E>();
-    // Until unique_ptr with a custom deleter or vector with a custom allocator
-    // is cuda compatible, we unfortunately have to use a custom equivalent
-    class constexpr_unique {
-    public:
-      explicit constexpr constexpr_unique(allocator_type &mem_pool)
-          : mem_pool{&mem_pool}, ptr{mem_pool.allocate(storage_needed)} {}
-      constexpr_unique(constexpr_unique &) = delete;
-      constexpr ~constexpr_unique() {
-        mem_pool->deallocate(ptr, storage_needed);
-      }
-      constexpr eval_type *get() const { return ptr; }
 
-    private:
-      allocator_type *mem_pool;
-      eval_type *ptr;
-    };
-    constexpr_unique partial_results_ptr{mem_pool};
+    _impl::constexpr_unique<eval_type, allocator_type> partial_results_ptr{
+        mem_pool, storage_needed};
     std::span<eval_type, storage_needed> partial_span{partial_results_ptr.get(),
                                                       storage_needed};
     _impl::exactfp_eval_impl<eval_type>(std::forward<E>(e), partial_span);
@@ -108,7 +94,7 @@ constexpr std::pair<eval_type, eval_type> eval_with_err(E_ &&e) noexcept {
 // This only performs an extra addition and multiplication by a compile time
 // value, followed by a comparison to filter out obviously correct results.
 // The additional bool return indicates whether future relative error analysis
-// with max_reul_error is useful
+// with max_rel_error is useful
 template <arith_number eval_type, typename E_>
   requires(expr_type<E_> || arith_number<E_>)
 constexpr auto eval_checked_fast(E_ &&e) noexcept {
@@ -123,7 +109,8 @@ constexpr auto eval_checked_fast(E_ &&e) noexcept {
     using Op = typename E::Op;
     const eval_type result = Op{}(left_result, right_result);
 
-    if constexpr (!std::is_same_v<std::multiplies<>, Op> && depth(E{}) > 2) {
+    if constexpr (depth(E{}) > 2 && (std::is_same_v<std::plus<>, Op> ||
+                                     std::is_same_v<std::minus<>, Op>)) {
       const eval_type nan{std::numeric_limits<double>::signaling_NaN()};
       if constexpr (std::is_same_v<std::minus<>, Op>) {
         right_result = -right_result;
