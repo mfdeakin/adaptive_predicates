@@ -347,7 +347,6 @@ consteval bool sign_guaranteed(E expr) {
 
 namespace _impl {
 
-
 constexpr std::size_t left_branch_id(const std::size_t branch_id) {
   return branch_id + 1;
 }
@@ -358,6 +357,27 @@ constexpr std::size_t right_branch_id(const std::size_t branch_id) {
   // id as its right sibiling.
   // We don't use this id for leaf nodes, so it's not an issue here
   return branch_id + num_internal_nodes<typename expr_t::LHS>() + 1;
+}
+
+template <std::size_t branch_id, evaluatable root_t>
+constexpr std::size_t get_memory_begin_idx() {
+  static_assert(branch_id < num_internal_nodes<root_t>(),
+                "The branch_id passed is too large for this expression tree");
+  static constexpr std::size_t root_branch_id = 0;
+  if constexpr (branch_id == root_branch_id) {
+    return 0;
+  } else {
+    if constexpr (branch_id < _impl::right_branch_id<root_t>(root_branch_id)) {
+      return get_memory_begin_idx<branch_id -
+                                      _impl::left_branch_id(root_branch_id),
+                                  typename root_t::LHS>();
+    } else {
+      return num_partials_for_exact<typename root_t::LHS>() +
+             get_memory_begin_idx<branch_id - _impl::right_branch_id<root_t>(
+                                                  root_branch_id),
+                                  typename root_t::RHS>();
+    }
+  }
 }
 
 template <typename Op> consteval std::size_t op_latency() {

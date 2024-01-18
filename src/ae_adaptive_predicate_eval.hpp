@@ -70,32 +70,12 @@ public:
 private:
   static constexpr std::size_t root_branch_id = 0;
 
-  template <std::size_t branch_id, evaluatable subexpr_t,
-            evaluatable root_t = E>
-  std::span<eval_type, num_partials_for_exact<subexpr_t>()>
-  get_memory(std::span<eval_type, num_partials_for_exact<root_t>()> superspan) {
-    static_assert(num_partials_for_exact<root_t>() >=
-                  num_partials_for_exact<subexpr_t>());
-    if constexpr (num_partials_for_exact<root_t>() ==
-                  num_partials_for_exact<subexpr_t>()) {
-      // This means branch_id == 0
-      return superspan;
-    } else {
-      if constexpr (expr_type<typename root_t::LHS> &&
-                    branch_id < _impl::right_branch_id<root_t>(branch_id)) {
-        // branch_id > left_branch_id(0)
-        return get_memory<branch_id - _impl::left_branch_id(0), subexpr_t,
-                          typename root_t::LHS>(
-            superspan.template subspan<
-                0, num_partials_for_exact<typename root_t::LHS>()>());
-      }
-      // branch_id > right_branch_id(0)
-      return get_memory<branch_id - _impl::right_branch_id<root_t>(0),
-                        subexpr_t, typename root_t::RHS>(
-          superspan.template subspan<
-              num_partials_for_exact<typename root_t::LHS>(),
-              num_partials_for_exact<typename root_t::RHS>()>());
-    }
+  template <std::size_t branch_id, evaluatable subexpr_t>
+  std::span<eval_type, num_partials_for_exact<subexpr_t>()> get_memory() {
+    constexpr static std::size_t begin_idx =
+        _impl::get_memory_begin_idx<branch_id, E>();
+    return std::span<eval_type, num_partials_for_exact<subexpr_t>()>{
+        exact_storage.data() + begin_idx, num_partials_for_exact<subexpr_t>()};
   }
 
   // exact_eval_root computes the requested result of the (sub)expression to 1/2
@@ -103,9 +83,7 @@ private:
   template <std::size_t branch_id>
   std::pair<eval_type, eval_type> exact_eval_root(evaluatable auto &&expr) {
     using sub_expr = decltype(expr);
-    auto memory = get_memory<branch_id, sub_expr>(
-        std::span<eval_type, num_partials_for_exact<E>()>{
-            exact_storage.data(), num_partials_for_exact<E>()});
+    auto memory = get_memory<branch_id, sub_expr>();
     exact_eval<branch_id>(std::forward<sub_expr>(expr), memory);
     _impl::merge_sum(memory);
 
