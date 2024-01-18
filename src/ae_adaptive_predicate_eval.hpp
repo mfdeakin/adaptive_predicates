@@ -63,66 +63,39 @@ public:
   template <typename EE>
     requires std::is_same_v<std::remove_cvref_t<EE>, E>
   eval_type eval(EE &&e) {
-    const auto v = eval_impl<branch_token_leaf>(std::forward<EE>(e)).first;
+    const auto v = eval_impl<root_branch_id>(std::forward<EE>(e)).first;
     return v;
   }
 
 private:
-  class branch_token_leaf : public branch_token_s {
-  public:
-    template <template <class> class branch_dir>
-    using append_branch = branch_dir<branch_token_leaf>;
+  static constexpr std::size_t root_branch_id = 0;
 
-    branch_token_leaf &get() { return *this; }
-
-    std::optional<eval_type> result;
-  };
-
-  template <branch_token branch> constexpr auto get_memory() {
-    // since exact_storage might be a vector, ensure the compiler knows how
-    // large the vector is
-    return get_memory_impl<branch, E>(
-        std::span<eval_type, num_partials_for_exact<E>()>{exact_storage});
-  }
-
-  template <branch_token branch, typename sub_expr, std::ranges::range span_t>
-    requires expr_type<sub_expr> || arith_number<sub_expr>
-  constexpr auto get_memory_impl(span_t span) {
-    if constexpr (std::is_same_v<branch_token_leaf, branch>) {
-      return span;
-    } else if constexpr (branch::is_left()) {
-      static_assert(!branch::is_right());
-      return get_memory_impl<typename branch::S, typename sub_expr::LHS>(
-          span.template first<
-              num_partials_for_exact<typename sub_expr::LHS>()>());
-    } else {
-      static_assert(branch::is_right());
-      return get_memory_impl<typename branch::S, typename sub_expr::RHS>(
-          span.template subspan<
-              num_partials_for_exact<typename sub_expr::LHS>(),
-              num_partials_for_exact<typename sub_expr::RHS>()>());
-    }
+  template <std::size_t branch_id, evaluatable subexpr_t>
+  std::span<eval_type, num_partials_for_exact<subexpr_t>()> get_memory() {
+    constexpr static std::size_t begin_idx =
+        _impl::get_memory_begin_idx<branch_id, E>();
+    return std::span<eval_type, num_partials_for_exact<subexpr_t>()>{
+        exact_storage.data() + begin_idx, num_partials_for_exact<subexpr_t>()};
   }
 
   // exact_eval_root computes the requested result of the (sub)expression to 1/2
   // epsilon precision
-  template <branch_token branch>
+  template <std::size_t branch_id>
   std::pair<eval_type, eval_type> exact_eval_root(evaluatable auto &&expr) {
     using sub_expr = decltype(expr);
-    branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
-    auto memory = get_memory<branch>();
-    exact_eval<branch>(std::forward<sub_expr>(expr), memory);
+    auto memory = get_memory<branch_id, sub_expr>();
+    exact_eval<branch_id>(std::forward<sub_expr>(expr), memory);
     _impl::merge_sum(memory);
 
     const eval_type exact_result = std::reduce(memory.begin(), memory.end());
-    exact_eval_info.result = exact_result;
+    cache[branch_id] = exact_result;
     return {exact_result, abs(exact_result) *
                               std::numeric_limits<eval_type>::epsilon() / 2.0};
   }
 
   // handle_overshoot attempts to determine the most efficient method of
   // reducing error to levels that guarantee the correct sign
-  template <branch_token branch>
+  template <std::size_t branch_id>
   std::pair<eval_type, eval_type>
   handle_overshoot(expr_type auto &&expr, const eval_type result,
                    const eval_type left_result, const eval_type left_abs_err,
@@ -143,10 +116,6 @@ private:
     if constexpr (exact_fp_rounding_latency<sub_expr>() >
                       subexpr_choice_latency &&
                   is_expr_v<LHS> && is_expr_v<RHS>) {
-      using left_branch =
-          typename branch::template append_branch<branch_token_left>;
-      using right_branch =
-          typename branch::template append_branch<branch_token_right>;
       // We need to reduce error efficiently, so don't just exactly evaluate
       // the whole expression, try to only evaluate the largest contributor
       // to the error
@@ -163,7 +132,7 @@ private:
           // guarantees we deal with the largest part of the error, making
           // the fall-through case very unlikely
           const auto [new_left, new_left_err] =
-              exact_eval_root<left_branch>(expr.lhs());
+              exact_eval_root<_impl::left_branch_id(branch_id)>(expr.lhs());
 
           const auto [new_result, new_abs_err] =
               _impl::eval_with_max_abs_err<Op>(new_left, new_left_err,
@@ -175,7 +144,8 @@ private:
           }
         } else {
           const auto [new_right, new_right_err] =
-              exact_eval_root<right_branch>(expr.rhs());
+              exact_eval_root<_impl::right_branch_id<sub_expr>(branch_id)>(
+                  expr.rhs());
           const auto [new_result, new_abs_err] =
               _impl::eval_with_max_abs_err<Op>(left_result, left_abs_err,
                                                new_right, new_right_err);
@@ -187,29 +157,25 @@ private:
         }
       }
     }
-    return exact_eval_root<branch>(std::forward<sub_expr_>(expr));
+    return exact_eval_root<branch_id>(std::forward<sub_expr_>(expr));
   }
 
   // Returns the result and maximum absolute error from computing the expression
-  template <branch_token branch = branch_token_leaf>
-  std::pair<eval_type, eval_type> eval_impl(evaluatable auto &&expr) {
-    using sub_expr_ = decltype(expr);
+  template <std::size_t branch_id, evaluatable sub_expr_>
+  std::pair<eval_type, eval_type> eval_impl(sub_expr_ &&expr) {
     using sub_expr = std::remove_cvref_t<sub_expr_>;
-
     if constexpr (is_expr_v<sub_expr>) {
-      branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
-      if (exact_eval_info.result) {
-        return {*exact_eval_info.result,
-                abs(*exact_eval_info.result) *
+      const auto exact_eval_info = cache[branch_id];
+      if (exact_eval_info) {
+        return {*exact_eval_info,
+                abs(*exact_eval_info) *
                     std::numeric_limits<eval_type>::epsilon() / 2.0};
       }
       using Op = typename sub_expr::Op;
-      using left_branch =
-          typename branch::template append_branch<branch_token_left>;
-      using right_branch =
-          typename branch::template append_branch<branch_token_right>;
-      auto [left_result, left_abs_err] = eval_impl<left_branch>(expr.lhs());
-      auto [right_result, right_abs_err] = eval_impl<right_branch>(expr.rhs());
+      auto [left_result, left_abs_err] =
+          eval_impl<_impl::left_branch_id(branch_id)>(expr.lhs());
+      auto [right_result, right_abs_err] =
+          eval_impl<_impl::right_branch_id<sub_expr>(branch_id)>(expr.rhs());
       const auto [result, max_abs_err] = _impl::eval_with_max_abs_err<Op>(
           left_result, left_abs_err, right_result, right_abs_err);
 
@@ -239,9 +205,9 @@ private:
             const eval_type overshoot =
                 _impl::error_overshoot(result, max_abs_err);
             if (overshoot > 0.0) {
-              return handle_overshoot<branch>(expr, result, left_result,
-                                              left_abs_err, right_result,
-                                              right_abs_err, max_abs_err);
+              return handle_overshoot<branch_id>(expr, result, left_result,
+                                                 left_abs_err, right_result,
+                                                 right_abs_err, max_abs_err);
             }
           }
         }
@@ -252,7 +218,7 @@ private:
     }
   }
 
-  template <branch_token branch, typename sub_expr_>
+  template <std::size_t branch_id, typename sub_expr_>
     requires expr_type<sub_expr_> || arith_number<sub_expr_>
   constexpr void
   exact_eval(sub_expr_ &&e,
@@ -260,21 +226,21 @@ private:
                  partial_results) noexcept {
     using sub_expr = std::remove_cvref_t<sub_expr_>;
     if constexpr (is_expr_v<sub_expr>) {
-      branch_token_leaf &exact_eval_info = std::get<branch>(cache).get();
-      if (exact_eval_info.result) {
+      if (cache[branch_id]) {
         return;
       }
       constexpr std::size_t reserve_left =
           num_partials_for_exact<typename sub_expr::LHS>();
       const auto storage_left = partial_results.template first<reserve_left>();
-      exact_eval<typename branch::template append_branch<branch_token_left>>(
-          e.lhs(), storage_left);
+      exact_eval<_impl::left_branch_id(branch_id)>(e.lhs(), storage_left);
+
       constexpr std::size_t reserve_right =
           num_partials_for_exact<typename sub_expr::RHS>();
       const auto storage_right =
           partial_results.template subspan<reserve_left, reserve_right>();
-      exact_eval<typename branch::template append_branch<branch_token_right>>(
-          e.rhs(), storage_right);
+      exact_eval<_impl::right_branch_id<sub_expr>(branch_id)>(e.rhs(),
+                                                              storage_right);
+
       using Op = typename sub_expr::Op;
       if constexpr (std::is_same_v<std::plus<>, Op> ||
                     std::is_same_v<std::minus<>, Op>) {
@@ -295,10 +261,7 @@ private:
     }
   }
 
-  using cache_tuple =
-      std::invoke_result_t<enumerate_branches_functor<branch_token_leaf>, E>;
-
-  cache_tuple cache;
+  std::array<std::optional<eval_type>, num_internal_nodes<E>()> cache;
 
   std::vector<eval_type, std::remove_cvref_t<allocator_type_>> exact_storage;
 };
