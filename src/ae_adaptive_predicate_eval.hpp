@@ -89,11 +89,8 @@ private:
 
     const eval_type exact_result = std::reduce(memory.begin(), memory.end());
     cache[branch_id] = exact_result;
-    int exponent;
-    std::frexp(exact_result, &exponent);
-    const eval_type rel_err = std::ldexp(
-        eval_type{1.0}, exponent - std::numeric_limits<eval_type>::digits - 1);
-    return {exact_result, rel_err};
+    return {exact_result, abs(exact_result) *
+                              std::numeric_limits<eval_type>::epsilon() / 2.0};
   }
 
   // handle_overshoot attempts to determine the most efficient method of
