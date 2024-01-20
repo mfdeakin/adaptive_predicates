@@ -196,8 +196,8 @@ constexpr auto pt_orient_expr(points_type &&points) {
 namespace _impl {
 
 template <_impl::incircle_tuple points_type, std::size_t... indices>
-constexpr auto pt_incircle_expr(points_type &&points,
-                                std::index_sequence<indices...>) {
+constexpr auto pt_incircle_expr_impl(points_type &&points,
+                                     std::index_sequence<indices...>) {
   static constexpr std::size_t last_idx =
       std::tuple_size<typename std::remove_cvref<points_type>::type>::value - 1;
   const auto ref_pt = std::get<last_idx>(points);
@@ -216,13 +216,13 @@ template <_impl::incircle_tuple points_type>
 constexpr auto pt_incircle_expr(points_type &&points) {
   static constexpr std::size_t num_circle_pts =
       std::tuple_size<typename std::remove_cvref<points_type>::type>::value - 1;
-  return _impl::pt_incircle_expr(points,
-                                 std::make_index_sequence<num_circle_pts>());
+  return _impl::pt_incircle_expr_impl(
+      points, std::make_index_sequence<num_circle_pts>());
 }
 
 template <adaptive_expr::arith_number coord_type>
-constexpr auto
-pt_incircle_explicit_expr(const std::array<std::array<coord_type, 3>, 5> &points) {
+constexpr auto pt_incircle_explicit_expr(
+    const std::array<std::array<coord_type, 3>, 5> &points) {
   constexpr std::size_t x = 0;
   constexpr std::size_t y = 1;
   constexpr std::size_t z = 2;
@@ -330,58 +330,28 @@ constexpr auto index_square_matrix(std::index_sequence<row_inds...> is) {
   return std::make_tuple(index_row<row_inds>(is)...);
 }
 
-template <tuple_like tuple_type, std::size_t... col_pre,
-          std::size_t... col_post>
-constexpr auto submatrix_rm_row(tuple_type &&row,
-                                std::index_sequence<col_pre...>,
-                                std::index_sequence<col_post...>) {
-  static constexpr std::size_t post_start = sizeof...(col_pre) + 1;
-  const auto left =
-      std::make_tuple(std::get<col_pre>(std::forward<tuple_type>(row))...);
-  const auto right = std::make_tuple(
-      std::get<post_start + col_post>(std::forward<tuple_type>(row))...);
-  return std::tuple_cat(left, right);
-}
-
-template <std::size_t remove_col, square_matrix_tuple matrix_type,
-          std::size_t... row_pre, std::size_t... row_post>
-constexpr auto submatrix_rm_col(matrix_type &&matrix,
-                                std::index_sequence<row_pre...>,
-                                std::index_sequence<row_post...>) {
-  constexpr std::size_t N =
-      std::tuple_size<typename std::remove_cvref<matrix_type>::type>::value;
-  static constexpr std::size_t post_start = sizeof...(row_pre) + 1;
-
-  const auto top = std::make_tuple(submatrix_rm_row(
-      std::get<row_pre>(matrix), std::make_index_sequence<remove_col>(),
-      std::make_index_sequence<N - 1 - remove_col>())...);
-
-  const auto bottom = std::make_tuple(
-      submatrix_rm_row(std::get<post_start + row_post>(matrix),
-                       std::make_index_sequence<remove_col>(),
-                       std::make_index_sequence<N - 1 - remove_col>())...);
-
-  return std::tuple_cat(top, bottom);
-}
-
-// Constructs an (N-1)x(N-1) from the passed matrix, excluding the specified row
-// and the specified column
-template <std::size_t remove_row = 0, std::size_t remove_col = 0,
-          square_matrix_tuple matrix_type>
-constexpr auto submatrix(matrix_type &&matrix) {
-  constexpr std::size_t N =
-      std::tuple_size<typename std::remove_cvref<matrix_type>::type>::value;
-  return submatrix_rm_col<remove_col>(
-      matrix, std::make_index_sequence<remove_row>(),
-      std::make_index_sequence<N - 1 - remove_row>());
+template <std::size_t step_row, std::size_t step_col, typename _expr_t>
+constexpr auto adjust_mtx_indices(_expr_t &&e) {
+  using expr_t = std::remove_cvref_t<_expr_t>;
+  if constexpr (is_expr_v<expr_t>) {
+    return make_expr<typename expr_t::Op>(
+        adjust_mtx_indices<step_row, step_col>(e.lhs()),
+        adjust_mtx_indices<step_row, step_col>(e.rhs()));
+  } else {
+    constexpr std::size_t row = expr_t::row;
+    constexpr std::size_t col = expr_t::col;
+    return matrix_index<(row < step_row ? row : row + 1),
+                        (col < step_col ? col : col + 1)>{};
+  }
 }
 
 template <tuple_like tuple_type, std::size_t... indices>
   requires _impl::square_matrix_tuple<tuple_type>
-consteval auto determinant(tuple_type &&matrix,
-                           std::index_sequence<indices...> is) {
+consteval auto determinant_impl(tuple_type &&matrix,
+                                std::index_sequence<indices...>) {
   static constexpr std::size_t N =
       std::tuple_size<typename std::remove_cvref<tuple_type>::type>::value;
+  static_assert(N == sizeof...(indices));
   if constexpr (N == 1) {
     return std::get<0>(std::get<0>(std::forward<tuple_type>(matrix)));
   } else if constexpr (N == 2) {
@@ -390,26 +360,14 @@ consteval auto determinant(tuple_type &&matrix,
                    std::get<1>(std::get<0>(std::forward<tuple_type>(matrix)))},
         std::tuple{std::get<0>(std::get<1>(std::forward<tuple_type>(matrix))),
                    std::get<1>(std::get<1>(std::forward<tuple_type>(matrix)))});
-  } else if constexpr (N == 3) {
-    const auto cross_prod = vec_cross_expr(
-        std::tuple{std::get<0>(std::get<0>(std::forward<tuple_type>(matrix))),
-                   std::get<1>(std::get<0>(std::forward<tuple_type>(matrix))),
-                   std::get<2>(std::get<0>(std::forward<tuple_type>(matrix)))},
-        std::tuple{std::get<0>(std::get<1>(std::forward<tuple_type>(matrix))),
-                   std::get<1>(std::get<1>(std::forward<tuple_type>(matrix))),
-                   std::get<2>(std::get<1>(std::forward<tuple_type>(matrix)))});
-    return std::get<0>(std::get<2>(std::forward<tuple_type>(matrix))) *
-               std::get<0>(cross_prod) -
-           std::get<1>(std::get<2>(std::forward<tuple_type>(matrix))) *
-               std::get<1>(cross_prod) +
-           std::get<2>(std::get<2>(std::forward<tuple_type>(matrix))) *
-               std::get<2>(cross_prod);
   } else {
-    return balance_expr(
-        ((std::get<0>(std::get<indices>(std::forward<tuple_type>(matrix))) *
-          determinant(submatrix<indices, 0>(std::forward<tuple_type>(matrix)),
-                      is)) -
-         ... - additive_id{}));
+    constexpr auto subdet =
+        determinant_impl(index_square_matrix(std::make_index_sequence<N - 1>()),
+                         std::make_index_sequence<N - 1>());
+    return balance_expr((mult_expr(std::get<0>(std::get<indices>(
+                                       std::forward<tuple_type>(matrix))),
+                                   adjust_mtx_indices<indices, 0>(subdet)) -
+                         ... - additive_id{}));
   }
 }
 
@@ -440,10 +398,21 @@ template <typename tuple_type>
 constexpr auto determinant(tuple_type &&matrix) {
   static constexpr std::size_t N =
       std::tuple_size<typename std::remove_cvref<tuple_type>::type>::value;
-  using index_expr = decltype(_impl::determinant(
-      _impl::index_square_matrix(std::make_index_sequence<N>()),
-      std::make_index_sequence<N>()));
-  return _impl::apply_indices<index_expr>(std::forward<tuple_type>(matrix));
+
+  if constexpr (N == 1) {
+    return std::get<0>(std::get<0>(std::forward<tuple_type>(matrix)));
+  } else if constexpr (N == 2) {
+    return vec_cross_expr(
+        std::tuple{std::get<0>(std::get<0>(std::forward<tuple_type>(matrix))),
+                   std::get<1>(std::get<0>(std::forward<tuple_type>(matrix)))},
+        std::tuple{std::get<0>(std::get<1>(std::forward<tuple_type>(matrix))),
+                   std::get<1>(std::get<1>(std::forward<tuple_type>(matrix)))});
+  } else {
+    using index_expr = decltype(_impl::determinant_impl(
+        _impl::index_square_matrix(std::make_index_sequence<N>()),
+        std::make_index_sequence<N>()));
+    return _impl::apply_indices<index_expr>(std::forward<tuple_type>(matrix));
+  }
 }
 
 template <std::size_t row, typename entry_type, std::size_t N>
