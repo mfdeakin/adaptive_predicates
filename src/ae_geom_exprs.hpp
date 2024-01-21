@@ -204,10 +204,32 @@ constexpr auto pt_incircle_expr_impl(points_type &&points,
   const auto offset_pts = std::make_tuple(adaptive_expr::pt_diff_expr(
       std::get<indices>(std::forward<points_type>(points)), ref_pt)...);
   const auto insphere_matrix = std::make_tuple(
-      std::tuple_cat(std::get<indices>(offset_pts),
-                     std::make_tuple(adaptive_expr::vec_mag_expr(
-                         std::get<indices>(offset_pts))))...);
-  return determinant(insphere_matrix);
+      std::tuple_cat(std::make_tuple(adaptive_expr::vec_mag_expr(
+                         std::get<indices>(offset_pts))),
+                     std::get<indices>(offset_pts))...);
+  const auto det = determinant(insphere_matrix);
+  // We rotated the columns of the following matrix:
+  // x0 y0 x0^2+y0^2 1
+  // x1 y1 x1^2+y1^2 1
+  // x2 y2 x2^2+y2^2 1
+  // x3 y3 x3^2+y3^2 1
+  //
+  // to become
+  //
+  // x0^2+y0^2 x0 y0 1
+  // x1^2+y1^2 x1 y1 1
+  // x2^2+y2^2 x2 y2 1
+  // x3^2+y3^2 x3 y3 1
+  //
+  // This requires N-1 column swaps, multiplying our determinant by (-1)^(N-1),
+  // so we need to account for the possible negation
+  // We perform this rotation so that the resulting expression is significantly
+  // simpler than if the paraboloid lifting term was in the sub-determinants
+  if constexpr (last_idx % 2 == 1) {
+    return det;
+  } else {
+    return -det;
+  }
 }
 
 } // namespace _impl
@@ -218,66 +240,6 @@ constexpr auto pt_incircle_expr(points_type &&points) {
       std::tuple_size<typename std::remove_cvref<points_type>::type>::value - 1;
   return _impl::pt_incircle_expr_impl(
       points, std::make_index_sequence<num_circle_pts>());
-}
-
-template <adaptive_expr::arith_number coord_type>
-constexpr auto pt_incircle_explicit_expr(
-    const std::array<std::array<coord_type, 3>, 5> &points) {
-  constexpr std::size_t x = 0;
-  constexpr std::size_t y = 1;
-  constexpr std::size_t z = 2;
-  const auto ptdiff_expr = [](const auto &lhs, const auto &rhs) constexpr {
-    return std::array{adaptive_expr::minus_expr(lhs[x], rhs[x]),
-                      adaptive_expr::minus_expr(lhs[y], rhs[y]),
-                      adaptive_expr::minus_expr(lhs[z], rhs[z])};
-  };
-  const auto delta_0 = ptdiff_expr(points[0], points[4]);
-  const auto delta_1 = ptdiff_expr(points[1], points[4]);
-  const auto delta_2 = ptdiff_expr(points[2], points[4]);
-  const auto delta_3 = ptdiff_expr(points[3], points[4]);
-
-  const auto cross_2d_expr = [](const auto &lhs, const auto &rhs) constexpr {
-    return adaptive_expr::mult_expr(lhs[x], rhs[y]) -
-           adaptive_expr::mult_expr(lhs[y], rhs[x]);
-  };
-  const auto cross_0_1 = cross_2d_expr(delta_0, delta_1);
-  const auto cross_1_2 = cross_2d_expr(delta_1, delta_2);
-  const auto cross_2_3 = cross_2d_expr(delta_2, delta_3);
-  const auto cross_3_0 = cross_2d_expr(delta_3, delta_0);
-  const auto cross_0_2 = cross_2d_expr(delta_0, delta_2);
-  const auto cross_1_3 = cross_2d_expr(delta_1, delta_3);
-
-  // Computes the terms for the determinant of the following matrix:
-  //
-  // [ d0x, d0y, d0z, 1 ]
-  // [ d1x, d1y, d1z, 1 ]
-  // [ d2x, d2y, d2z, 1 ]
-  // [ d3x, d3y, d3z, 1 ]
-  //
-  const auto det_3 = (delta_0[z] * cross_1_2 - delta_1[z] * cross_0_2 +
-                      delta_2[z] * cross_0_1);
-  const auto det_0 = -(delta_1[z] * cross_2_3 - delta_2[z] * cross_1_3 +
-                       delta_3[z] * cross_1_2);
-  const auto det_1 = (delta_2[z] * cross_3_0 + delta_3[z] * cross_0_2 +
-                      delta_0[z] * cross_2_3);
-  const auto det_2 = -(delta_3[z] * cross_0_1 + delta_0[z] * cross_1_3 +
-                       delta_1[z] * cross_3_0);
-
-  const auto magsq_expr = [](const auto &vec) constexpr {
-    return vec[x] * vec[x] + vec[y] * vec[y] + vec[z] * vec[z];
-  };
-  const auto magsq_0 = magsq_expr(delta_0);
-  const auto magsq_1 = magsq_expr(delta_1);
-  const auto magsq_2 = magsq_expr(delta_2);
-  const auto magsq_3 = magsq_expr(delta_3);
-
-  return magsq_3 * det_3 + magsq_2 * det_2 + magsq_1 * det_1 + magsq_0 * det_0;
-}
-
-template <adaptive_expr::arith_number coord_type>
-constexpr auto
-pt_incircle_explicit_expr(std::array<std::array<coord_type, 3>, 5> &&points) {
-  return pt_incircle_explicit_expr(points);
 }
 
 namespace _impl {
