@@ -28,8 +28,9 @@ using namespace adaptive_expr;
 #ifdef HAS_CGAL
 static constexpr std::size_t x = 0;
 static constexpr std::size_t y = 1;
+static constexpr std::size_t z = 2;
 
-#define CGAL_PREAMBLE(points)                                                  \
+#define CGAL_ORIENT2D_PREAMBLE(points)                                         \
   CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt0(   \
       points[0][x], points[0][y]);                                             \
   CGAL::Point_2<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt1(   \
@@ -40,7 +41,7 @@ static constexpr std::size_t y = 1;
 #define CGAL_ORIENT2D_CALL_METHOD(method) method(cgal_pt0, cgal_pt1, cgal_pt2)
 
 #define CGAL_ORIENT2D_CASE(name, tags, points)                                 \
-  BENCHMARK_CASE(CGAL_PREAMBLE, CGAL_ORIENT2D_CALL_METHOD, name,               \
+  BENCHMARK_CASE(CGAL_ORIENT2D_PREAMBLE, CGAL_ORIENT2D_CALL_METHOD, name,      \
                  "[cgal][orient2d]" tags, CGAL::orientation, points)
 #else // HAS_CGAL
 #define CGAL_ORIENT2D_CASE(name, tags, points)
@@ -99,6 +100,29 @@ ORIENT2D_POINTS_CASE(orient2d_cases[1].first, "[points1]")
 ORIENT2D_POINTS_CASE(orient2d_cases[2].first, "[points2]")
 ORIENT2D_POINTS_CASE(orient2d_cases[17].first, "[points3]")
 
+#ifdef HAS_CGAL
+#define CGAL_INCIRCLE3D_PREAMBLE(points)                                       \
+  CGAL::Point_3<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt0(   \
+      points[0][x], points[0][y], points[0][z]);                               \
+  CGAL::Point_3<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt1(   \
+      points[1][x], points[1][y], points[1][z]);                               \
+  CGAL::Point_3<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt2(   \
+      points[2][x], points[2][y], points[2][z]);                               \
+  CGAL::Point_3<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt3(   \
+      points[3][x], points[3][y], points[3][z]);                               \
+  CGAL::Sphere_3 cgal_sphere(cgal_pt0, cgal_pt1, cgal_pt2, cgal_pt3);          \
+  CGAL::Point_3<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt4(   \
+      points[4][x], points[4][y], points[4][z]);
+
+#define CGAL_INCIRCLE3D_CALL_METHOD(method) method(cgal_pt4)
+
+#define CGAL_INCIRCLE3D_CASE(name, tags, points)                               \
+  BENCHMARK_CASE(CGAL_INCIRCLE3D_PREAMBLE, CGAL_INCIRCLE3D_CALL_METHOD, name,  \
+                 "[cgal][incircle3d]" tags, cgal_sphere.bounded_side, points)
+#else // HAS_CGAL
+#define CGAL_INSPHERE3D_CASE(name, tags, points)
+#endif // HAS_CGAL
+
 #define SHEWCHUK_INCIRCLE3D_PREAMBLE(points)                                   \
   Shewchuk::exactinit();                                                       \
   const real *sh_pt0 = points[0].data();                                       \
@@ -135,7 +159,8 @@ ORIENT2D_POINTS_CASE(orient2d_cases[17].first, "[points3]")
                      exactfp_eval<real>, points)                               \
   AE_INCIRCLE3D_CASE("Adaptive evaluation", "[adaptive_eval]" tag,             \
                      adaptive_eval<real>, points)                              \
-  SHEWCHUK_INCIRCLE3D_CASE("Shewchuk InCircle3D", tag, points)
+  SHEWCHUK_INCIRCLE3D_CASE("Shewchuk InCircle3D", tag, points)                 \
+  CGAL_INCIRCLE3D_CASE("CGAL InCircle3D", tag, points)
 
 INCIRCLE3D_POINTS_CASE(in_circle3d_cases[0].first, "[points0]")
 INCIRCLE3D_POINTS_CASE(in_circle3d_cases[1].first, "[points1]")
