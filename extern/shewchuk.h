@@ -17,9 +17,12 @@ void exactinit();
 double orient2d(const double *pa, const double *pb, const double *pc);
 double orient2dfast(const double *pa, const double *pb, const double *pc);
 double orient2dexact(const double *pa, const double *pb, const double *pc);
-double orient3d(const double *pa, const double *pb, const double *pc);
-double orient3dfast(const double *pa, const double *pb, const double *pc);
-double orient3dexact(const double *pa, const double *pb, const double *pc);
+double orient3d(const double *pa, const double *pb, const double *pc,
+                const double *pd);
+double orient3dfast(const double *pa, const double *pb, const double *pc,
+                    const double *pd);
+double orient3dexact(const double *pa, const double *pb, const double *pc,
+                     const double *pd);
 double incircle(const double *pa, const double *pb, const double *pc,
                 const double *pd);
 double incirclefast(const double *pa, const double *pb, const double *pc,

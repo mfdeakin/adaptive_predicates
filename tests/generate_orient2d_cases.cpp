@@ -33,7 +33,7 @@ int main() {
   };
   for (;;) {
     const auto points = gen_points();
-    const auto expr = build_orient2d_case(points);
+    const auto expr = pt_orient_expr(points);
     if (!correct_eval<double>(expr)) {
       if (!check_sign(adaptive_eval<double>(expr), fp_eval<double>(expr))) {
         fmt::print("std::pair{{\n"

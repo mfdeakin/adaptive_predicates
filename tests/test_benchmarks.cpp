@@ -110,7 +110,8 @@ ORIENT2D_POINTS_CASE(orient2d_cases[17].first, "[points3]")
       points[2][x], points[2][y], points[2][z]);                               \
   CGAL::Point_3<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt3(   \
       points[3][x], points[3][y], points[3][z]);                               \
-  CGAL::Sphere_3 cgal_sphere(cgal_pt0, cgal_pt1, cgal_pt2, cgal_pt3);          \
+  CGAL::Sphere_3<CGAL::Exact_predicates_exact_constructions_kernel>            \
+      cgal_sphere(cgal_pt0, cgal_pt1, cgal_pt2, cgal_pt3);                     \
   CGAL::Point_3<CGAL::Exact_predicates_exact_constructions_kernel> cgal_pt4(   \
       points[4][x], points[4][y], points[4][z]);
 
@@ -120,7 +121,7 @@ ORIENT2D_POINTS_CASE(orient2d_cases[17].first, "[points3]")
   BENCHMARK_CASE(CGAL_INCIRCLE3D_PREAMBLE, CGAL_INCIRCLE3D_CALL_METHOD, name,  \
                  "[cgal][incircle3d]" tags, cgal_sphere.bounded_side, points)
 #else // HAS_CGAL
-#define CGAL_INSPHERE3D_CASE(name, tags, points)
+#define CGAL_INCIRCLE3D_CASE(name, tags, points)
 #endif // HAS_CGAL
 
 #define SHEWCHUK_INCIRCLE3D_PREAMBLE(points)                                   \
