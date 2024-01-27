@@ -1,0 +1,6 @@
+
+add_executable(generate_cases generate_cases.cpp generate_orient2d_case.cpp generate_orient3d_case.cpp generate_incircle2d_case.cpp generate_incircle3d_case.cpp)
+target_compile_features(generate_cases PRIVATE cxx_std_23)
+target_compile_options(generate_cases PRIVATE -fdebug-types-section)
+target_link_libraries(generate_cases PRIVATE adaptive_predicates fmt::fmt shewchuk)
+target_include_directories(generate_cases PRIVATE ${CMAKE_SOURCE_DIR}/extern)

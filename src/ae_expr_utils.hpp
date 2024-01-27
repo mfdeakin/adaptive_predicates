@@ -363,7 +363,7 @@ template <std::size_t branch_id, evaluatable root_t>
 constexpr std::size_t get_memory_begin_idx() {
   static_assert(branch_id < num_internal_nodes<root_t>(),
                 "The branch_id passed is too large for this expression tree");
-  static constexpr std::size_t root_branch_id = 0;
+  constexpr std::size_t root_branch_id = 0;
   if constexpr (branch_id == root_branch_id) {
     return 0;
   } else {

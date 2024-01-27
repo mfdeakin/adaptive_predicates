@@ -14,7 +14,7 @@ int main() {
   double final_result = 0.0;
   for (int i = 0; i < 10000000; ++i) {
     for (auto [points, _] : orient2d_cases) {
-      auto expr = build_orient2d_case(points);
+      auto expr = adaptive_expr::pt_orient_expr(points);
       final_result += adaptive_eval<real>(expr);
     }
   }

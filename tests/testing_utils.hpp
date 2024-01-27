@@ -9,21 +9,11 @@
 #include "ae_adaptive_predicate_eval.hpp"
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
+#include "ae_geom_exprs.hpp"
 
 constexpr std::size_t vec_size = 4;
 
-#if __cpp_lib_mdspan >= 202207L
-#include <mdspan>
-using std::extents;
-using std::mdarray;
-using std::mdspan;
-#else
-#include <mdspan.hpp>
-using std::experimental::extents;
-using std::experimental::mdarray;
-using std::experimental::mdspan;
-#endif
-
+// Returns true if the signs match or both are zero
 template <adaptive_expr::arith_number eval_type>
 constexpr bool check_sign(eval_type correct, eval_type check) {
   if (correct == eval_type{0.0}) {
@@ -33,22 +23,6 @@ constexpr bool check_sign(eval_type correct, eval_type check) {
   } else {
     return std::signbit(correct) == std::signbit(check);
   }
-}
-
-template <adaptive_expr::arith_number eval_type>
-constexpr auto
-build_orient2d_case(const std::array<std::array<eval_type, 2>, 3> &points) {
-  constexpr std::size_t x = 0;
-  constexpr std::size_t y = 1;
-  const std::array v1{adaptive_expr::minus_expr(points[1][x], points[0][x]),
-                      adaptive_expr::minus_expr(points[1][y], points[0][y])};
-  const std::array v2{adaptive_expr::minus_expr(points[2][x], points[0][x]),
-                      adaptive_expr::minus_expr(points[2][y], points[0][y])};
-  const auto cross_expr = [](const auto &lhs, const auto &rhs) constexpr {
-    return adaptive_expr::mult_expr(lhs[x], rhs[y]) -
-           adaptive_expr::mult_expr(lhs[y], rhs[x]);
-  };
-  return cross_expr(v1, v2);
 }
 
 constexpr auto build_orient2d_vec_case(std::ranges::range auto window) {
@@ -63,7 +37,7 @@ constexpr auto build_orient2d_vec_case(std::ranges::range auto window) {
     }
     expected.insert(i, window[i].second);
   }
-  return std::pair{build_orient2d_case(points), expected};
+  return std::pair{adaptive_expr::pt_orient_expr(points), expected};
 }
 
 template <adaptive_expr::arith_number eval_type>
@@ -80,34 +54,6 @@ build_orient2d_matrix(const std::array<std::array<eval_type, 2>, 3> &points) {
   array[2, 1] = points[2][1];
   array[2, 2] = eval_type{1};
   return array;
-}
-
-template <adaptive_expr::arith_number eval_type>
-constexpr auto
-build_incircle2d_case(const std::array<std::array<eval_type, 2>, 4> &points) {
-  constexpr std::size_t x = 0;
-  constexpr std::size_t y = 1;
-  const auto dist_expr = [](const std::array<eval_type, 2> pt) constexpr {
-    return adaptive_expr::mult_expr(pt[x], pt[x]) +
-           adaptive_expr::mult_expr(pt[y], pt[y]);
-  };
-  const auto cross_expr = [](const std::array<eval_type, 2> &lhs,
-                             const std::array<eval_type, 2> &rhs) constexpr {
-    return adaptive_expr::mult_expr(lhs[x], rhs[y]) -
-           adaptive_expr::mult_expr(lhs[y], rhs[x]);
-  };
-  const auto incircle_subexpr =
-      [dist_expr, cross_expr](const std::array<eval_type, 2> &p0,
-                              const std::array<eval_type, 2> &p1,
-                              const std::array<eval_type, 2> &p2) constexpr {
-        return dist_expr(p0) * cross_expr(p1, p2) -
-               dist_expr(p1) * cross_expr(p0, p2) +
-               dist_expr(p2) * cross_expr(p0, p1);
-      };
-  return balance_expr(-incircle_subexpr(points[1], points[2], points[3]) +
-                      incircle_subexpr(points[0], points[2], points[3]) -
-                      incircle_subexpr(points[0], points[1], points[3]) +
-                      incircle_subexpr(points[0], points[1], points[2]));
 }
 
 template <typename eval_type, typename row_exprs, std::size_t N>
@@ -129,15 +75,16 @@ auto exchange_pivot(const mdspan<row_exprs, extents<std::size_t, N, N>> mtx) {
 
 // Based on LU Factorization, except written to avoid divisions in the exact
 // evaluation.
-// Returns an approximate value with sign matching the sign of the determinant.
-// Terminates as early as possible for a non-full rank matrix returning 0
+// Returns an approximate value with sign matching the sign of the
+// determinant. Terminates as early as possible for a non-full rank matrix
+// returning 0
 //
-// LU factorization decomposes a matrix M into a lower triangular matrix L and
-// an upper triangular matrix U. L has 1's on its diagonal, so the determinant
-// of M is the determinant of U, which is the product of its diagonal.
-// This computes U multiplied by some scaling matrices to avoid divisions;
-// the determinant is then the determinant of the resulting matrix divided by
-// the determinants of the scaling matrices
+// LU factorization decomposes a matrix M into a lower triangular matrix L
+// and an upper triangular matrix U. L has 1's on its diagonal, so the
+// determinant of M is the determinant of U, which is the product of its
+// diagonal. This computes U multiplied by some scaling matrices to avoid
+// divisions; the determinant is then the determinant of the resulting
+// matrix divided by the determinants of the scaling matrices
 template <typename eval_type, typename row_exprs, std::size_t N>
 constexpr eval_type
 determinant(const mdspan<row_exprs, extents<std::size_t, N, N>> mtx) {
