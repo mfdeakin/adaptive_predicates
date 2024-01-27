@@ -25,14 +25,14 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         build_type: [debug, release]
-        c_compiler: [gcc-13, clang-18]
+        c_compiler: [gcc-13, clang-19]
         include:
           - os: ubuntu-latest
             c_compiler: gcc-13
             cpp_compiler: g++-13
           - os: ubuntu-latest
-            c_compiler: clang-18
-            cpp_compiler: clang++-18
+            c_compiler: clang-19
+            cpp_compiler: clang++-19
 
     steps:
     - uses: actions/checkout@v4
@@ -68,6 +68,10 @@ jobs:
         sudo add-apt-repository ppa:fenics-packages/fenics
         sudo apt-get update
         sudo apt-get install lcov catch2 libcgal-dev libfmt-dev ninja-build
+
+    - name: Download argparse
+      run: |
+        git clone https://github.com/p-ranav/argparse.git
 
     - name: Setup the testing presets
       run: cp ${{ github.workspace }}/.github/workflows/CMakeUserPresets.json ${{ github.workspace }}

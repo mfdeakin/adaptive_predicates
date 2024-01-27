@@ -13,7 +13,8 @@
         "description": "Configuration settings specific to Ubuntu",
         "cacheVariables": {
           "CMAKE_CXX_FLAGS": "-mfma",
-          "BENCHMARK_CGAL": "ON"
+          "BENCHMARK_CGAL": "ON",
+          "ARGPARSE_DIR": "${sourceDir}/argparse/include"
         }
       },
   
@@ -147,9 +148,6 @@
         "configurePreset": "ubuntu-latest-gcc-release",
         "output": {
           "verbosity": "verbose"
-        },
-        "filter": {
-          "exclude": { "name": "\\[benchmark\\]" }
         }
       },
       {
@@ -157,9 +155,6 @@
         "configurePreset": "ubuntu-latest-clang-release",
         "output": {
           "verbosity": "verbose"
-        },
-        "filter": {
-          "exclude": { "name": "\\[benchmark\\]" }
         }
       }
     ]
