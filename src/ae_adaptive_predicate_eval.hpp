@@ -84,8 +84,17 @@ private:
   std::pair<eval_type, eval_type> exact_eval_root(evaluatable auto &&expr) {
     using sub_expr = decltype(expr);
     auto memory = get_memory<branch_id, sub_expr>();
-    exact_eval<branch_id>(std::forward<sub_expr>(expr), memory);
-    _impl::merge_sum(memory);
+    if constexpr (_impl::linear_merge_lower_latency<eval_type, sub_expr>()) {
+      exact_eval_root<_impl::left_branch_id(branch_id)>(expr.lhs());
+      exact_eval_root<_impl::right_branch_id<
+          typename std::remove_cvref<sub_expr>::type>(branch_id)>(expr.rhs());
+      const auto midpoint =
+          memory.begin() + num_partials_for_exact<decltype(expr.lhs())>();
+      _impl::merge_sum_linear_fast(memory, midpoint);
+    } else {
+      exact_eval<branch_id>(std::forward<sub_expr>(expr), memory);
+      _impl::merge_sum(memory);
+    }
 
     const eval_type exact_result = std::reduce(memory.begin(), memory.end());
     cache[branch_id] = exact_result;
@@ -108,12 +117,12 @@ private:
     using Op = typename sub_expr::Op;
 
     constexpr std::size_t subexpr_choice_latency =
-        std::max(exact_fp_rounding_latency<LHS>(),
-                 exact_fp_rounding_latency<RHS>()) +
+        std::max(exact_fp_rounding_latency<eval_type, LHS>(),
+                 exact_fp_rounding_latency<eval_type, RHS>()) +
         2 * overshoot_latency() + 2 * cmp_latency() +
         error_contrib_latency<Op>();
 
-    if constexpr (exact_fp_rounding_latency<sub_expr>() >
+    if constexpr (exact_fp_rounding_latency<eval_type, sub_expr>() >
                       subexpr_choice_latency &&
                   is_expr_v<LHS> && is_expr_v<RHS>) {
       // We need to reduce error efficiently, so don't just exactly evaluate

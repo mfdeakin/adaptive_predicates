@@ -380,6 +380,8 @@ constexpr std::size_t get_memory_begin_idx() {
   }
 }
 
+// A simple (overly pessimistic) attempt to model latencies so decisions
+// regarding algorithm choices can be made by the compiler
 template <typename Op> consteval std::size_t op_latency() {
   if constexpr (std::is_same_v<std::plus<>, Op> ||
                 std::is_same_v<std::minus<>, Op>) {
@@ -401,10 +403,134 @@ template <typename Op> consteval std::size_t error_contrib_latency() {
 consteval std::size_t cmp_latency() { return 1; }
 consteval std::size_t abs_latency() { return 1; }
 consteval std::size_t fma_latency() { return 4; }
+consteval std::size_t swap_latency() { return 2; }
+consteval std::size_t mem_alloc_latency() {
+  // This probably results in a cache miss, so guess a high latency
+  return 100;
+}
+
+template <typename eval_type>
+consteval std::size_t unchecked_two_sum_latency() {
+  if (vector_type<eval_type>) {
+    // unchecked_dekker_sum has 2 subtractions, 1 addition
+    return op_latency<std::plus<>>() + 2 * op_latency<std::minus<>>();
+  } else {
+    // knuth_sum has 2 additions, 4 subtractions.
+    return 2 * op_latency<std::plus<>>() + 4 * op_latency<std::plus<>>();
+  }
+}
+
+template <typename eval_type> consteval std::size_t two_sum_latency() {
+  if (vector_type<eval_type>) {
+    // Needs to compare the absolute values of the entries, and then use
+    // unchecked sum Assume branch prediction is optimized away
+    return unchecked_two_sum_latency<eval_type>() + 2 * abs_latency() +
+           cmp_latency();
+  } else {
+    // knuth_sum has 2 additions, 4 subtractions.
+    return 2 * op_latency<std::plus<>>() + 4 * op_latency<std::plus<>>();
+  }
+}
+
 consteval std::size_t overshoot_latency() {
   return abs_latency() + op_latency<std::plus<>>();
 }
 
+// Computes the total (non-pipelined) latency of merging two sorted lists
+// into one sorted list.
+// Merging two sorted lists in linear time requires a memory allocation which
+// can be pretty expensive.
+consteval std::size_t merge_latency(std::size_t left_terms,
+                                    std::size_t right_terms) {
+  return (left_terms + right_terms - 1) * cmp_latency() + mem_alloc_latency();
+}
+
+// Computes the total (non-pipelined) latency of the quadratic merge sum
+// algorithm
+// Note that this ignores the zero elimination, assumes neither subtree has used
+// the merge sum algorithm (so we can't just perform a partial merge) and is
+// overly pessimistic
+template <typename eval_type, typename E_>
+consteval std::size_t merge_sum_latency() {
+  using E = std::remove_cvref_t<E_>;
+  if constexpr (is_expr_v<E>) {
+    const std::size_t terms = num_partials_for_exact<E>();
+    return (terms - 1) * terms * two_sum_latency<eval_type>() / 2;
+  } else {
+    return 0;
+  }
+}
+
+// Computes the total (non-pipelined) latency of the linear merge sum
+// algorithm.
+// Note that this ignores zero elimination, and doesn't compute the latency of
+// the required merges of the left and right subtree
+template <typename eval_type, typename E_>
+consteval std::size_t merge_sum_linear_latency() {
+  using E = std::remove_cvref_t<E_>;
+  if constexpr (is_expr_v<E>) {
+    using LHS = typename E::LHS;
+    using RHS = typename E::RHS;
+    const std::size_t left_terms = num_partials_for_exact<LHS>();
+    const std::size_t right_terms = num_partials_for_exact<RHS>();
+    return (left_terms + right_terms - 2) * two_sum_latency<eval_type>() +
+           unchecked_two_sum_latency<eval_type>() +
+           merge_latency(left_terms, right_terms);
+  } else {
+    return 0;
+  }
+}
+
+template <typename eval_type, typename E_>
+consteval std::size_t total_merge_sum_latency();
+
+// Determines whether it's more efficient to use the linear merge over the
+// quadratic merge with the overly pessimistic latency model above
+template <typename eval_type, typename E_>
+consteval bool linear_merge_lower_latency() {
+  using E = std::remove_cvref_t<E_>;
+  if constexpr (is_expr_v<E>) {
+    using LHS = typename E::LHS;
+    using RHS = typename E::RHS;
+    constexpr std::size_t linear_latency =
+        merge_sum_linear_latency<eval_type, E>();
+    constexpr std::size_t quadratic_latency = merge_sum_latency<eval_type, E>();
+    // linear merge has a high constant latency, reduce template instantiations
+    // by checking that it's faster than the quadratic merge first
+    if constexpr (linear_latency < quadratic_latency) {
+      constexpr std::size_t total_linear_latency =
+          total_merge_sum_latency<eval_type, LHS>() +
+          total_merge_sum_latency<eval_type, RHS>() + linear_latency;
+      return total_linear_latency < quadratic_latency;
+    } else {
+      return false;
+    }
+  } else {
+    return false;
+  }
+}
+
+template <typename eval_type, typename E_>
+consteval std::size_t total_merge_sum_latency() {
+  using E = std::remove_cvref_t<E_>;
+  if constexpr (is_expr_v<E>) {
+    if constexpr (linear_merge_lower_latency<eval_type, E>()) {
+      using LHS = typename E::LHS;
+      using RHS = typename E::RHS;
+      return total_merge_sum_latency<eval_type, LHS>() +
+             total_merge_sum_latency<eval_type, RHS>() +
+             merge_sum_linear_latency<eval_type, E>();
+    } else {
+      return merge_sum_latency<eval_type, E>();
+    }
+  } else {
+    return 0;
+  }
+}
+
+// The latency cost of all of the (addition doesn't need to do anything)
+// negations and multiplications that need to happen to get a series which sums
+// to the exact result
 template <typename E_> consteval std::size_t exact_fp_latency() {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr_v<E>) {
@@ -436,20 +562,16 @@ template <typename E_> consteval std::size_t exact_fp_latency() {
   }
 }
 
-template <typename E_> consteval std::size_t exact_fp_rounding_latency() {
+// The latency cost converting the sum into a value representable as `eval_type`
+// with at most 1/2 epsilon rounding error
+// Note that this ignores the zero elimination and is overly pessimistic
+template <typename eval_type, typename E_>
+consteval std::size_t exact_fp_rounding_latency() {
   using E = std::remove_cvref_t<E_>;
   if constexpr (is_expr_v<E>) {
-    const std::size_t fp_vals = num_partials_for_exact<E>();
-    // dekker_sum has 2 additions, 2 abs(), 1 comparison.
-    // Assume branch prediction is optimized away
-    const std::size_t two_sum_cost =
-        2 * op_latency<std::plus<>>() + 2 * abs_latency() + cmp_latency();
-
-    const std::size_t exact_latency = exact_fp_latency<E_>();
-    // Note that this ignores the zero elimination and is overly pessimistic
-    const std::size_t merge_latency =
-        two_sum_cost * fp_vals * (fp_vals - 1) / 2;
-    const std::size_t accumulate_latency = fp_vals - 1;
+    const std::size_t exact_latency = exact_fp_latency<E>();
+    const std::size_t merge_latency = total_merge_sum_latency<eval_type, E>();
+    const std::size_t accumulate_latency = num_partials_for_exact<E>() - 1;
     return exact_latency + merge_latency + accumulate_latency;
   } else {
     return 0;
