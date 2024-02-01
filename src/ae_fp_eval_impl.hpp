@@ -232,7 +232,6 @@ auto merge_sum_linear_fast(
          ++nonzero_itr) {
     }
     std::ranges::rotate(storage, nonzero_itr);
-
     auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
     auto out = storage.begin();
     *out = q;
@@ -392,6 +391,86 @@ constexpr void sparse_mult(span_l storage_left, span_r storage_right,
       --out_i;
       *out_i = lower;
       --out_i;
+    }
+  }
+}
+
+template <std::ranges::range span_l, typename eval_type,
+          std::ranges::range span_result>
+constexpr void sparse_mult_merge_term(const span_l storage_left,
+                                      const eval_type v, span_result result) {
+  // h is the output list
+  // We only need two values of Q at a time
+  // T_i, t_i are transient
+  //
+  // (Q_2, h_1) <= exact_mult(l[0], v)
+  // for i : 1 ... m
+  //   (T_i, t_i) <= exact_mult(l[i], v)
+  //   (Q_{2i - 1}, h_{2i - 2}) <= two_sum(Q_{2i - 2}, t_i)
+  //   (Q_{2i}, h_{2i - 1}) <= fast_two_sum(T_i, Q_{2i - 1})
+  // h_{2m} <= Q_{2m}
+  const auto r0 = exact_mult(storage_left[0], v);
+  eval_type q0{r0.first};
+  eval_type q1{0};
+  result[0] = r0.second;
+  for (std::size_t i = 1; i < storage_left.size(); ++i) {
+    const auto [T, t] = exact_mult(storage_left[i], v);
+    const auto ri0 = two_sum(q0, t);
+    q1 = ri0.first;
+    result[2 * i - 1] = ri0.second;
+    const auto ri1 = two_sum(T, q1);
+    q0 = ri1.first;
+    result[2 * i] = ri0.second;
+  }
+  result[result.size() - 1] = q0;
+}
+
+template <std::ranges::range span_l, std::ranges::range span_r,
+          std::ranges::range span_result, typename allocator_type_>
+constexpr void sparse_mult_merge(span_l storage_left, span_r storage_right,
+                                 span_result result,
+                                 allocator_type_ &&mem_pool) {
+  using eval_type = std::remove_cvref_t<decltype(*storage_left.begin())>;
+  using allocator_type = std::remove_cvref_t<allocator_type_>;
+  std::vector<eval_type, allocator_type> left_terms{storage_left.size(),
+                                                    mem_pool};
+  std::ranges::copy(storage_left, left_terms.begin());
+  std::vector<eval_type, allocator_type> right_terms{storage_right.size(),
+                                                     mem_pool};
+  std::ranges::copy(storage_right, right_terms.begin());
+  if (left_terms.size() < right_terms.size()) {
+    // We want to minimize the number of lists to merge at the end since merging
+    // has a high constant cost
+    std::swap(left_terms, right_terms);
+  }
+  const auto output_size = 2 * left_terms.size();
+  // Multiply all left_terms by all right_terms
+  for (const auto [i, v] : right_terms | std::views::enumerate) {
+    const auto output = result.subspan(i * output_size, output_size);
+    sparse_mult_merge_term(left_terms, v, output);
+  }
+  // We have |right_terms| strongly non-overlapping lists, we
+  // need to merge them efficiently
+  // Most efficient is to merge them in pairs of increasing size, giving
+  // O(n log(n)) runtime, versus O(n^2)
+
+  for (std::size_t merge_level = 1; 2 * merge_level <= right_terms.size();
+       merge_level *= 2) {
+    const std::size_t merge_size = merge_level * output_size;
+    std::size_t start = 0;
+    for (; start + 2 * merge_size <= result.size(); start += 2 * merge_size) {
+      auto merge_span = result.subspan(start, 2 * merge_size);
+      merge_sum_linear(merge_span, merge_span.begin() + merge_size);
+    }
+    if (start < result.size()) {
+      if (start > 0) {
+        const std::size_t prev_start = start - 2 * merge_size;
+        const std::size_t span_len = result.size() - prev_start;
+        auto merge_span = result.subspan(prev_start, span_len);
+        merge_sum_linear(merge_span, merge_span.begin() + 2 * merge_size);
+      } else {
+        merge_sum_linear(result, result.begin() + 2 * merge_size);
+      }
     }
   }
 }

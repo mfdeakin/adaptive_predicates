@@ -53,10 +53,13 @@ template <typename E_, typename eval_type, typename allocator_type_>
 class adaptive_eval_impl {
 public:
   using E = std::remove_cvref_t<E_>;
+  using allocator_type = std::remove_cvref_t<allocator_type_>;
 
-  explicit adaptive_eval_impl(allocator_type_ mem_pool)
-      : exact_storage{num_partials_for_exact<E>(),
-                      std::forward<allocator_type_>(mem_pool)} {}
+  adaptive_eval_impl() = default;
+
+  explicit adaptive_eval_impl(allocator_type mem_pool_)
+      : cache(), mem_pool(std::forward<allocator_type_>(mem_pool_)),
+        exact_storage{num_partials_for_exact<E>(), mem_pool} {}
 
   explicit adaptive_eval_impl(const E_ &) : adaptive_eval_impl() {}
 
@@ -78,24 +81,13 @@ private:
         exact_storage.data() + begin_idx, num_partials_for_exact<subexpr_t>()};
   }
 
-  // exact_eval_root computes the requested result of the (sub)expression to 1/2
-  // epsilon precision
+  // exact_eval_round computes the requested result of the (sub)expression to
+  // 1/2 epsilon precision
   template <std::size_t branch_id>
-  std::pair<eval_type, eval_type> exact_eval_root(evaluatable auto &&expr) {
+  std::pair<eval_type, eval_type> exact_eval_round(evaluatable auto &&expr) {
     using sub_expr = decltype(expr);
     auto memory = get_memory<branch_id, sub_expr>();
-    if constexpr (_impl::linear_merge_lower_latency<eval_type, sub_expr>()) {
-      exact_eval_root<_impl::left_branch_id(branch_id)>(expr.lhs());
-      exact_eval_root<_impl::right_branch_id<
-          typename std::remove_cvref<sub_expr>::type>(branch_id)>(expr.rhs());
-      const auto midpoint =
-          memory.begin() + num_partials_for_exact<decltype(expr.lhs())>();
-      _impl::merge_sum_linear_fast(memory, midpoint);
-    } else {
-      exact_eval<branch_id>(std::forward<sub_expr>(expr), memory);
-      _impl::merge_sum(memory);
-    }
-
+    exact_eval_merge<branch_id>(std::forward<sub_expr>(expr), memory);
     const eval_type exact_result = std::reduce(memory.begin(), memory.end());
     cache[branch_id] = exact_result;
     return {exact_result, abs(exact_result) *
@@ -141,7 +133,7 @@ private:
           // guarantees we deal with the largest part of the error, making
           // the fall-through case very unlikely
           const auto [new_left, new_left_err] =
-              exact_eval_root<_impl::left_branch_id(branch_id)>(expr.lhs());
+              exact_eval_round<_impl::left_branch_id(branch_id)>(expr.lhs());
 
           const auto [new_result, new_abs_err] =
               _impl::eval_with_max_abs_err<Op>(new_left, new_left_err,
@@ -153,7 +145,7 @@ private:
           }
         } else {
           const auto [new_right, new_right_err] =
-              exact_eval_root<_impl::right_branch_id<sub_expr>(branch_id)>(
+              exact_eval_round<_impl::right_branch_id<sub_expr>(branch_id)>(
                   expr.rhs());
           const auto [new_result, new_abs_err] =
               _impl::eval_with_max_abs_err<Op>(left_result, left_abs_err,
@@ -166,7 +158,7 @@ private:
         }
       }
     }
-    return exact_eval_root<branch_id>(std::forward<sub_expr_>(expr));
+    return exact_eval_round<branch_id>(std::forward<sub_expr_>(expr));
   }
 
   // Returns the result and maximum absolute error from computing the expression
@@ -227,6 +219,23 @@ private:
     }
   }
 
+  template <std::size_t branch_id, typename sub_expr>
+    requires expr_type<sub_expr> || arith_number<sub_expr>
+  constexpr void
+  exact_eval_merge(sub_expr &&e,
+                   std::span<eval_type, num_partials_for_exact<sub_expr>()>
+                       partial_results) noexcept {
+    exact_eval<branch_id>(std::forward<sub_expr>(e), partial_results);
+    if constexpr (!_impl::linear_merge_lower_latency<eval_type, sub_expr>()) {
+      // In cases where the linear merge algorithm doesn't make sense, we need
+      // to ensure we can compute the correctly rounded result with just a
+      // reduction.
+      // In cases where the linear merge algorithm does make sense, this is
+      // already handled by exact_eval
+      _impl::merge_sum(partial_results);
+    }
+  }
+
   template <std::size_t branch_id, typename sub_expr_>
     requires expr_type<sub_expr_> || arith_number<sub_expr_>
   constexpr void
@@ -249,6 +258,20 @@ private:
           partial_results.template subspan<reserve_left, reserve_right>();
       exact_eval<_impl::right_branch_id<sub_expr>(branch_id)>(e.rhs(),
                                                               storage_right);
+      if constexpr (_impl::linear_merge_lower_latency<eval_type, sub_expr_>()) {
+        // Since we're at a point where we want to use linear merge sum,
+        // we need to ensure the lower levels of the tree have been merged
+        // together. If they're also at a point where linear merge sum is being
+        // used, then they're already merged and we don't need to do anything
+        if constexpr (!_impl::linear_merge_lower_latency<eval_type,
+                                                         decltype(e.lhs())>()) {
+          _impl::merge_sum(storage_left);
+        }
+        if constexpr (!_impl::linear_merge_lower_latency<eval_type,
+                                                         decltype(e.rhs())>()) {
+          _impl::merge_sum(storage_right);
+        }
+      }
 
       using Op = typename sub_expr::Op;
       if constexpr (std::is_same_v<std::plus<>, Op> ||
@@ -258,11 +281,22 @@ private:
             v = -v;
           }
         }
+        if constexpr (_impl::linear_merge_lower_latency<eval_type,
+                                                        sub_expr_>()) {
+          _impl::merge_sum_linear(partial_results,
+                                  partial_results.begin() + reserve_left);
+        }
       } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
         const auto storage_mult =
             partial_results.template last<partial_results.size() -
                                           reserve_left - reserve_right>();
-        _impl::sparse_mult(storage_left, storage_right, storage_mult);
+        if constexpr (_impl::linear_merge_lower_latency<eval_type,
+                                                        sub_expr_>()) {
+          _impl::sparse_mult_merge(storage_left, storage_right, partial_results,
+                                   mem_pool);
+        } else {
+          _impl::sparse_mult(storage_left, storage_right, storage_mult);
+        }
       }
     } else if constexpr (!std::is_same_v<additive_id, sub_expr>) {
       // additive_id is zero, so we don't actually have memory allocated for it
@@ -272,7 +306,9 @@ private:
 
   std::array<std::optional<eval_type>, num_internal_nodes<E>()> cache;
 
-  std::vector<eval_type, std::remove_cvref_t<allocator_type_>> exact_storage;
+  allocator_type mem_pool;
+
+  std::vector<eval_type, allocator_type> exact_storage;
 };
 
 } // namespace _impl
