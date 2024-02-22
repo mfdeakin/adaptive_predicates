@@ -342,7 +342,7 @@ TEST_CASE("expr_template_eval_simple", "[expr_template_eval]") {
   REQUIRE(exactfp_eval<real>(e.lhs()) == -15.0);
   REQUIRE(exactfp_eval<real>(e) == -14.5);
   std::vector<real> fp_vals{5.0, 10.0, 11.0, 11.0, 44.0};
-  REQUIRE(merge_sum(std::span{fp_vals}) == 81.0);
+  REQUIRE(merge_sum(std::span{fp_vals}).first == 81.0);
   REQUIRE(correct_eval<real>(e));
   REQUIRE(!correct_eval<real>(e + 14.5));
   REQUIRE(*correct_eval<real>(e.lhs().lhs().lhs().lhs()) == 0.0);
@@ -389,16 +389,12 @@ TEST_CASE("nonoverlapping", "[eval_utils]") {
   CHECK(
       !is_nonoverlapping(std::vector<real>{-0.375, 0.5, 1.5, 0, 0, 0, -14.0}));
 
-  std::vector<real> merge_test1{0,
-                                -1.5436178396078065e-49,
-                                -2.184158631330676e-33,
-                                -1.1470824290427116e-16,
-                                0,
-                                1.0353799381025734e-34,
-                                -1.7308376953906192e-17,
-                                -1.2053999999999998};
+  std::vector<real> merge_test1{
+      -1.5436178396078065e-49, -2.184158631330676e-33,
+      -1.1470824290427116e-16, 0,
+      1.0353799381025734e-34,  -1.7308376953906192e-17,
+      -1.2053999999999998,     0};
   const auto midpoint1 = merge_test1.begin() + 4;
-  CHECK(*midpoint1 == real{0});
   CHECK(is_nonoverlapping(std::span{merge_test1.begin(), midpoint1}));
   CHECK(is_nonoverlapping(std::span{midpoint1, merge_test1.end()}));
   REQUIRE(midpoint1 > merge_test1.begin());

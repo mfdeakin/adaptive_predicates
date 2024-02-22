@@ -11,6 +11,8 @@
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
 
+#include <fmt/ranges.h>
+
 namespace adaptive_expr {
 
 namespace _impl {
@@ -25,19 +27,23 @@ namespace _impl {
  */
 auto merge_sum_linear(
     std::ranges::range auto &&storage,
-    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
-    typename std::remove_cvref_t<decltype(storage)>::value_type;
+    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint)
+    -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
+                 typename std::remove_cvref_t<decltype(storage.end())>>;
 auto merge_sum_linear_fast(
     std::ranges::range auto &&storage,
     const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type;
-constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
-    typename std::remove_cvref_t<decltype(storage)>::value_type;
+constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage)
+    -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
+                 std::remove_cvref_t<decltype(storage.end())>>;
 constexpr auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage)
-    -> typename std::remove_cvref_t<decltype(storage)>::value_type;
+    -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
+                 std::remove_cvref_t<decltype(storage.end())>>;
 
-constexpr auto merge_sum(std::ranges::range auto storage) ->
-    typename decltype(storage)::value_type {
+constexpr auto merge_sum(std::ranges::range auto storage)
+    -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
+                 std::remove_cvref_t<decltype(storage.end())>> {
   if constexpr (vector_type<typename decltype(storage)::value_type>) {
     return merge_sum_quadratic_keep_zeros(storage);
   } else {
@@ -49,6 +55,12 @@ template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_m>
 constexpr void sparse_mult(span_l storage_left, span_r storage_right,
                            span_m storage_mult);
+
+template <std::ranges::range span_l, std::ranges::range span_r,
+          std::ranges::range span_result, typename allocator_type_>
+constexpr auto sparse_mult_merge(span_l left_terms, span_r right_terms,
+                                 span_result result, allocator_type_ &&mem_pool)
+    -> decltype(result.end());
 
 template <arith_number eval_type>
 constexpr std::pair<eval_type, eval_type> knuth_sum(const eval_type &lhs,
@@ -225,7 +237,19 @@ auto merge_sum_linear_fast(
   if (storage.size() > 1) {
     std::ranges::inplace_merge(
         storage, midpoint, [](const eval_type &left, const eval_type &right) {
-          return abs(left) < abs(right);
+          // Zero pruning ensures all of the zeros are at the ends of left and
+          // right, so we need to ensure that zero is considered greater than
+          // any non-zero number
+          // This algorithm technically works regardless of where the zeros are,
+          // but ensuring they remain at the end allows us to reduce the number
+          // of computations we have to perform
+          if (left == eval_type{0}) {
+            return false;
+          } else if (right == eval_type{0}) {
+            return true;
+          } else {
+            return abs(left) < abs(right);
+          }
         });
     auto nonzero_itr = storage.begin();
     for (; nonzero_itr != storage.end() && *nonzero_itr == eval_type{0};
@@ -255,38 +279,77 @@ auto merge_sum_linear_fast(
 
 auto merge_sum_linear(
     std::ranges::range auto &&storage,
-    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
-    typename std::remove_cvref_t<decltype(storage)>::value_type {
+    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint)
+    -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
+                 typename std::remove_cvref_t<decltype(storage.end())>> {
   using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
     std::ranges::inplace_merge(
         storage, midpoint, [](const eval_type &left, const eval_type &right) {
-          return abs(left) < abs(right);
+          // Zero pruning ensures all of the zeros are at the ends of left and
+          // right, so we need to ensure that zero is considered greater than
+          // any non-zero number
+          // This algorithm technically works regardless of where the zeros are,
+          // but ensuring they remain at the end allows us to reduce the number
+          // of computations we have to perform
+          if (left == eval_type{0}) {
+            return false;
+          } else if (right == eval_type{0}) {
+            return true;
+          } else {
+            return abs(left) < abs(right);
+          }
         });
-    auto nonzero_itr = storage.begin();
-    for (; nonzero_itr != storage.end() && *nonzero_itr == eval_type{0};
-         ++nonzero_itr) {
+    // Not all of the code puts filtered zeros at the end yet, so we have to use
+    // an expensive filter
+    auto nonzero = storage | std::views::filter([](const eval_type v) {
+                     return v != eval_type{0};
+                   });
+    std::size_t nonzero_size = 0;
+    for (auto i = nonzero.begin(); i != nonzero.end(); ++i) {
+      ++nonzero_size;
     }
-    std::ranges::rotate(storage, nonzero_itr);
-    auto [Q, q] = dekker_sum_unchecked(storage[1], storage[0]);
-    auto out = storage.begin();
-    for (auto h : std::span{storage.begin() + 2, storage.end()}) {
-      auto [R, g] = dekker_sum_unchecked(h, q);
-      *out = g;
-      ++out;
-      std::tie(Q, q) = two_sum(Q, R);
+    if (nonzero_size > 1) {
+      auto &a = *nonzero.begin();
+      auto &b = *(++nonzero.begin());
+      auto [Q, q] = dekker_sum_unchecked(b, a);
+      // Because we aren't overwriting the entire array, we need to clear
+      // the values that we've processed
+      a = 0;
+      b = 0;
+      auto out = storage.begin();
+      for (auto &h : nonzero) {
+        auto [R, g] = dekker_sum_unchecked(h, q);
+        h = eval_type{0};
+        if (g != eval_type{0}) {
+          *out = g;
+          ++out;
+        }
+        std::tie(Q, q) = two_sum(Q, R);
+      }
+
+      if (q != eval_type{0}) {
+        *out = q;
+        ++out;
+      }
+      if (Q != eval_type{0}) {
+        *out = Q;
+        ++out;
+      }
+      return std::pair{Q, out};
+    } else if (nonzero_size == 1) {
+      eval_type &v = *nonzero.begin();
+      eval_type tmp = v;
+      v = 0;
+      storage[0] = tmp;
+      return std::pair{tmp, storage.begin() + 1};
+    } else {
+      return std::pair{0, storage.begin()};
     }
-
-    *out = q;
-    ++out;
-    *out = Q;
-    ++out;
-
-    return Q;
   } else if (storage.size() == 1) {
-    return storage[0];
+    return std::pair{storage[0], storage.begin() + 1};
   } else {
-    return 0.0;
+    return std::pair{0.0, storage.begin()};
   }
 }
 
@@ -305,8 +368,9 @@ constexpr auto merge_sum_append(auto begin, auto end, auto v) {
   return std::pair{out, v};
 }
 
-constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
-    typename std::remove_cvref_t<decltype(storage)>::value_type {
+constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage)
+    -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
+                 std::remove_cvref_t<decltype(storage.end())>> {
   using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
     auto out = storage.begin();
@@ -323,14 +387,14 @@ constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage) ->
       }
     }
     if (out == storage.begin()) {
-      return eval_type{0};
+      return {eval_type{0}, out};
     } else {
-      return *(out - 1);
+      return {*(out - 1), out};
     }
   } else if (storage.size() == 1) {
-    return storage[0];
+    return {storage[0], storage.end()};
   } else {
-    return eval_type{0.0};
+    return {eval_type{0.0}, storage.end()};
   }
 }
 
@@ -345,17 +409,18 @@ constexpr auto merge_sum_append_keep_zeros(auto begin, auto end) {
 }
 
 constexpr auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage)
-    -> typename std::remove_cvref_t<decltype(storage)>::value_type {
+    -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
+                 std::remove_cvref_t<decltype(storage.end())>> {
   using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
     for (auto inp = storage.begin(); inp != storage.end(); ++inp) {
       *inp = merge_sum_append_keep_zeros(storage.begin(), inp);
     }
-    return std::reduce(storage.begin(), storage.end());
+    return {std::reduce(storage.begin(), storage.end()), storage.end()};
   } else if (storage.size() == 1) {
-    return storage[0];
+    return {storage[0], storage.end()};
   } else {
-    return eval_type{0.0};
+    return {eval_type{0.0}, storage.end()};
   }
 }
 
@@ -397,8 +462,9 @@ constexpr void sparse_mult(span_l storage_left, span_r storage_right,
 
 template <std::ranges::range span_l, typename eval_type,
           std::ranges::range span_result>
-constexpr void sparse_mult_merge_term(const span_l storage_left,
-                                      const eval_type v, span_result result) {
+constexpr auto sparse_mult_merge_term(const span_l storage_left,
+                                      const eval_type v, span_result result)
+    -> decltype(result.begin()) {
   // h is the output list
   // We only need two values of Q at a time
   // T_i, t_i are transient
@@ -409,28 +475,43 @@ constexpr void sparse_mult_merge_term(const span_l storage_left,
   //   (Q_{2i - 1}, h_{2i - 2}) <= two_sum(Q_{2i - 2}, t_i)
   //   (Q_{2i}, h_{2i - 1}) <= fast_two_sum(T_i, Q_{2i - 1})
   // h_{2m} <= Q_{2m}
+  auto out = result.begin();
   eval_type q0;
-  std::tie(q0, result[0]) = exact_mult(storage_left[0], v);
+  std::tie(q0, *out) = exact_mult(storage_left[0], v);
+  if (*out != eval_type{0}) {
+    ++out;
+  }
   eval_type q1{0};
   for (std::size_t i = 1; i < storage_left.size(); ++i) {
     const auto [T, t] = exact_mult(storage_left[i], v);
-    std::tie(q1, result[2 * i - 1]) = two_sum(q0, t);
-    std::tie(q0, result[2 * i]) = two_sum(T, q1);
+    std::tie(q1, *out) = two_sum(q0, t);
+    if (*out != eval_type{0}) {
+      ++out;
+    }
+    std::tie(q0, *out) = two_sum(T, q1);
+    if (*out != eval_type{0}) {
+      ++out;
+    }
   }
-  result[2 * storage_left.size() - 1] = q0;
+  *out = q0;
+  if (*out != eval_type{0}) {
+    ++out;
+  }
+  std::fill(out, result.end(), eval_type{0});
+  return out;
 }
 
 template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_result, typename allocator_type_>
-constexpr void sparse_mult_merge(span_l storage_left, span_r storage_right,
-                                 span_result result,
-                                 allocator_type_ &&mem_pool) {
+constexpr auto sparse_mult_merge(span_l storage_left, span_r storage_right,
+                                 span_result result, allocator_type_ &&mem_pool)
+    -> decltype(result.end()) {
   using eval_type = std::remove_cvref_t<decltype(*storage_left.begin())>;
   using allocator_type = std::remove_cvref_t<allocator_type_>;
-  static constexpr auto nonzero = [](const eval_type v) {
-    return v != eval_type{0};
-  };
   const auto copy_nonzero = [&mem_pool](const std::ranges::range auto range) {
+    static constexpr auto nonzero = [](const eval_type v) {
+      return v != eval_type{0};
+    };
     auto nonzero_range = range | std::views::filter(nonzero);
     const std::size_t size =
         std::distance(nonzero_range.begin(), nonzero_range.end());
@@ -476,6 +557,7 @@ constexpr void sparse_mult_merge(span_l storage_left, span_r storage_right,
       }
     }
   }
+  return result.end();
 }
 
 template <arith_number eval_type>

@@ -45,8 +45,7 @@ exactfp_eval(E &&e, allocator_type_ &&mem_pool =
     std::span<eval_type, storage_needed> partial_span{partial_results_ptr.get(),
                                                       storage_needed};
     _impl::exactfp_eval_impl<eval_type>(std::forward<E>(e), partial_span);
-    const eval_type result = _impl::merge_sum(partial_span);
-    return result;
+    return _impl::merge_sum(partial_span).first;
   } else {
     return static_cast<eval_type>(e);
   }
