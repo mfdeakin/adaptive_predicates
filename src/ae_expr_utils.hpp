@@ -380,6 +380,42 @@ constexpr std::size_t get_memory_begin_idx() {
   }
 }
 
+// Useful functors for filtering and merging
+template <typename eval_type>
+static constexpr auto is_nonzero(const eval_type v) {
+  return v != eval_type{0};
+}
+
+template <typename eval_type, typename iterator>
+static constexpr auto zero_prune_store_inc(const eval_type v, iterator i)
+    -> iterator {
+  if constexpr (scalar_type<eval_type>) {
+    if (v) {
+      *i = v;
+      ++i;
+    }
+  } else {
+    *i = v;
+    ++i;
+  }
+  return i;
+}
+
+template <typename eval_type, typename iterator>
+static constexpr auto zero_prune_store_dec(const eval_type v, iterator i)
+    -> iterator {
+  if constexpr (scalar_type<eval_type>) {
+    if (v) {
+      *i = v;
+      --i;
+    }
+  } else {
+    *i = v;
+    --i;
+  }
+  return i;
+}
+
 // A simple (overly pessimistic) attempt to model latencies so decisions
 // regarding algorithm choices can be made by the compiler
 template <typename Op> consteval std::size_t op_latency() {

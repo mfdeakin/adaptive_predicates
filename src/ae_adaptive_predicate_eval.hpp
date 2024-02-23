@@ -287,15 +287,12 @@ private:
                                   partial_results.begin() + reserve_left);
         }
       } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
-        const auto storage_mult =
-            partial_results.template last<partial_results.size() -
-                                          reserve_left - reserve_right>();
         if constexpr (_impl::linear_merge_lower_latency<eval_type,
                                                         sub_expr_>()) {
           _impl::sparse_mult_merge(storage_left, storage_right, partial_results,
                                    mem_pool);
         } else {
-          _impl::sparse_mult(storage_left, storage_right, storage_mult);
+          _impl::sparse_mult(storage_left, storage_right, partial_results);
         }
       }
     } else if constexpr (!std::is_same_v<additive_id, sub_expr>) {

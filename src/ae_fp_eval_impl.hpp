@@ -53,8 +53,9 @@ constexpr auto merge_sum(std::ranges::range auto storage)
 
 template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_m>
-constexpr void sparse_mult(span_l storage_left, span_r storage_right,
-                           span_m storage_mult);
+constexpr auto sparse_mult(span_l storage_left, span_r storage_right,
+                           span_m storage_mult)
+    -> std::remove_cvref_t<decltype(storage_mult.end())>;
 
 template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_result, typename allocator_type_>
@@ -213,22 +214,14 @@ constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
         v = -v;
       }
     } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
-      const auto storage_mult = [partial_results]() {
-        if constexpr (span_t::extent == std::dynamic_extent) {
-          return partial_results.last(partial_results.size() - reserve_left -
-                                      reserve_right);
-        } else {
-          return partial_results.template last<partial_results.size() -
-                                               reserve_left - reserve_right>();
-        }
-      }();
-      sparse_mult(storage_left, storage_right, storage_mult);
+      sparse_mult(storage_left, storage_right, partial_results);
     }
   } else if constexpr (!std::is_same_v<additive_id, E>) {
     partial_results[0] = eval_type(e);
   }
 }
 
+// Linear merge sum which requires the inputs be strongly non-overlapping
 auto merge_sum_linear_fast(
     std::ranges::range auto &&storage,
     const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
@@ -277,6 +270,7 @@ auto merge_sum_linear_fast(
   }
 }
 
+// Linear merge sum without the strongly non-overlapping requirement
 auto merge_sum_linear(
     std::ranges::range auto &&storage,
     const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint)
@@ -302,9 +296,7 @@ auto merge_sum_linear(
         });
     // Not all of the code puts filtered zeros at the end yet, so we have to use
     // an expensive filter
-    auto nonzero = storage | std::views::filter([](const eval_type v) {
-                     return v != eval_type{0};
-                   });
+    auto nonzero = storage | std::views::filter(is_nonzero<eval_type>);
     std::size_t nonzero_size = 0;
     for (auto i = nonzero.begin(); i != nonzero.end(); ++i) {
       ++nonzero_size;
@@ -318,7 +310,7 @@ auto merge_sum_linear(
       a = 0;
       b = 0;
       auto out = storage.begin();
-      for (auto &h : nonzero) {
+      for (auto &h : nonzero | std::views::drop(1)) {
         auto [R, g] = dekker_sum_unchecked(h, q);
         h = eval_type{0};
         if (g != eval_type{0}) {
@@ -374,9 +366,7 @@ constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage)
   using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
     auto out = storage.begin();
-    for (eval_type &inp : storage | std::views::filter([](const eval_type v) {
-                            return v != eval_type{0};
-                          })) {
+    for (eval_type &inp : storage | std::views::filter(is_nonzero<eval_type>)) {
       eval_type v = inp;
       inp = eval_type{0.0};
       auto [new_out, result] = merge_sum_append(storage.begin(), out, v);
@@ -426,8 +416,9 @@ constexpr auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage)
 
 template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_m>
-constexpr void sparse_mult(span_l storage_left, span_r storage_right,
-                           span_m storage_mult) {
+constexpr auto sparse_mult(span_l storage_left, span_r storage_right,
+                           span_m storage_mult)
+    -> std::remove_cvref_t<decltype(storage_mult.end())> {
 #ifndef __FMA__
   static_assert(!vector_type<typename span_l::value_type>,
                 "Vectorization doesn't have a functional mul_sub method, "
@@ -452,11 +443,22 @@ constexpr void sparse_mult(span_l storage_left, span_r storage_right,
          ++l_itr) {
       const auto l = *l_itr;
       auto [upper, lower] = exact_mult(r, l);
-      *out_i = upper;
-      --out_i;
-      *out_i = lower;
-      --out_i;
+      out_i = zero_prune_store_dec(upper, out_i);
+      out_i = zero_prune_store_dec(lower, out_i);
     }
+  }
+  if (out_i >= storage_mult.begin()) {
+    // We want zeros at the end, so move the nonzero values to the beginning and
+    // overwrite the end
+    ++out_i;
+    std::copy(out_i, storage_mult.end(), storage_mult.begin());
+    const std::size_t num_terms =
+        storage_mult.size() - (out_i - storage_mult.begin());
+    out_i = storage_mult.begin() + num_terms;
+    std::fill(out_i, storage_mult.end(), typename span_m::value_type{0});
+    return out_i;
+  } else {
+    return storage_mult.end();
   }
 }
 
@@ -509,10 +511,7 @@ constexpr auto sparse_mult_merge(span_l storage_left, span_r storage_right,
   using eval_type = std::remove_cvref_t<decltype(*storage_left.begin())>;
   using allocator_type = std::remove_cvref_t<allocator_type_>;
   const auto copy_nonzero = [&mem_pool](const std::ranges::range auto range) {
-    static constexpr auto nonzero = [](const eval_type v) {
-      return v != eval_type{0};
-    };
-    auto nonzero_range = range | std::views::filter(nonzero);
+    auto nonzero_range = range | std::views::filter(is_nonzero<eval_type>);
     const std::size_t size =
         std::distance(nonzero_range.begin(), nonzero_range.end());
     std::vector<eval_type, allocator_type> terms{size, mem_pool};
