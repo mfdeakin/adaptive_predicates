@@ -11,8 +11,6 @@
 #include "ae_expr.hpp"
 #include "ae_expr_utils.hpp"
 
-#include <fmt/ranges.h>
-
 namespace adaptive_expr {
 
 namespace _impl {
@@ -294,6 +292,7 @@ auto merge_sum_linear(
             return abs(left) < abs(right);
           }
         });
+
     // Not all of the code puts filtered zeros at the end yet, so we have to use
     // an expensive filter
     auto nonzero = storage | std::views::filter(is_nonzero<eval_type>);
@@ -328,6 +327,7 @@ auto merge_sum_linear(
         *out = Q;
         ++out;
       }
+
       return std::pair{Q, out};
     } else if (nonzero_size == 1) {
       eval_type &v = *nonzero.begin();
@@ -462,11 +462,10 @@ constexpr auto sparse_mult(span_l storage_left, span_r storage_right,
   }
 }
 
-template <std::ranges::range span_l, typename eval_type,
-          std::ranges::range span_result>
+template <std::ranges::range span_l, typename eval_type, typename iterator_t>
 constexpr auto sparse_mult_merge_term(const span_l storage_left,
-                                      const eval_type v, span_result result)
-    -> decltype(result.begin()) {
+                                      const eval_type v, iterator_t out)
+    -> iterator_t {
   // h is the output list
   // We only need two values of Q at a time
   // T_i, t_i are transient
@@ -477,30 +476,52 @@ constexpr auto sparse_mult_merge_term(const span_l storage_left,
   //   (Q_{2i - 1}, h_{2i - 2}) <= two_sum(Q_{2i - 2}, t_i)
   //   (Q_{2i}, h_{2i - 1}) <= fast_two_sum(T_i, Q_{2i - 1})
   // h_{2m} <= Q_{2m}
-  auto out = result.begin();
-  eval_type q0;
-  std::tie(q0, *out) = exact_mult(storage_left[0], v);
-  if (*out != eval_type{0}) {
-    ++out;
-  }
-  eval_type q1{0};
+  auto [high, low] = exact_mult(storage_left[0], v);
+  eval_type accumulated = high;
+  out = zero_prune_store_inc(low, out);
   for (std::size_t i = 1; i < storage_left.size(); ++i) {
-    const auto [T, t] = exact_mult(storage_left[i], v);
-    std::tie(q1, *out) = two_sum(q0, t);
-    if (*out != eval_type{0}) {
-      ++out;
-    }
-    std::tie(q0, *out) = two_sum(T, q1);
-    if (*out != eval_type{0}) {
-      ++out;
-    }
+    const auto [mult_high, mult_low] = exact_mult(storage_left[i], v);
+    std::tie(high, low) = two_sum(accumulated, mult_low);
+    out = zero_prune_store_inc(low, out);
+    std::tie(accumulated, low) = two_sum(mult_high, high);
+    out = zero_prune_store_inc(low, out);
   }
-  *out = q0;
-  if (*out != eval_type{0}) {
-    ++out;
-  }
-  std::fill(out, result.end(), eval_type{0});
+  out = zero_prune_store_inc(accumulated, out);
   return out;
+}
+
+// Recursively merges the subspans with the linear merge algorithm
+template <std::ranges::range iter_span_type>
+constexpr auto merge_spans(const iter_span_type &iter_spans)
+    -> std::remove_cvref_t<decltype(iter_spans[0])> {
+  if (iter_spans.size() == 1) {
+    // We have zero ranges, nothing to do
+    return iter_spans[0];
+  } else if (iter_spans.size() == 2) {
+    // We have only one range, already merged
+    return iter_spans[1];
+  } else {
+    const std::size_t midpoint_itr = (iter_spans.size() - 1) / 2;
+    // The iterator marking beginning of the right subspan must be included in
+    // this subspan, so add 1 to midpoint
+    const auto left_span = std::span{iter_spans}.subspan(0, midpoint_itr + 1);
+    merge_spans(left_span);
+    const auto right_span = std::span{iter_spans}.subspan(
+        midpoint_itr, iter_spans.size() - midpoint_itr);
+    const auto right_end = merge_spans(right_span);
+
+    // Merge the two merged subspans together
+    std::span storage{iter_spans[0], right_end};
+    const auto midpoint_idx =
+        std::distance(iter_spans[0], iter_spans[midpoint_itr]);
+
+    const auto merge_itr =
+        merge_sum_linear(storage, storage.begin() + midpoint_idx).second;
+    // Unfortunately storage's type may have a different iterator type than
+    // what's in the span of iterators that we have, so we have to compute the
+    // equivalent iterator for
+    return iter_spans[0] + std::distance(storage.begin(), merge_itr);
+  }
 }
 
 template <std::ranges::range span_l, std::ranges::range span_r,
@@ -508,55 +529,30 @@ template <std::ranges::range span_l, std::ranges::range span_r,
 constexpr auto sparse_mult_merge(span_l storage_left, span_r storage_right,
                                  span_result result, allocator_type_ &&mem_pool)
     -> decltype(result.end()) {
-  using eval_type = std::remove_cvref_t<decltype(*storage_left.begin())>;
-  using allocator_type = std::remove_cvref_t<allocator_type_>;
-  const auto copy_nonzero = [&mem_pool](const std::ranges::range auto range) {
-    auto nonzero_range = range | std::views::filter(is_nonzero<eval_type>);
-    const std::size_t size =
-        std::distance(nonzero_range.begin(), nonzero_range.end());
-    std::vector<eval_type, allocator_type> terms{size, mem_pool};
-    std::ranges::copy(nonzero_range, terms.begin());
-    std::ranges::fill(range, eval_type{0});
-    return terms;
-  };
-  auto left_terms = copy_nonzero(storage_left);
-  auto right_terms = copy_nonzero(storage_right);
+  auto left_terms =
+      copy_nonzero(storage_left, std::forward<allocator_type_>(mem_pool));
+  auto right_terms =
+      copy_nonzero(storage_right, std::forward<allocator_type_>(mem_pool));
   if (left_terms.size() < right_terms.size()) {
     // We want to minimize the number of lists to merge at the end since merging
     // has a high constant cost
     std::swap(left_terms, right_terms);
   }
-  const auto output_size = 2 * left_terms.size();
-  // Multiply all left_terms by all right_terms
-  for (std::size_t i = 0; i < right_terms.size(); ++i) {
-    const auto output = result.subspan(i * output_size, output_size);
-    sparse_mult_merge_term(left_terms, right_terms[i], output);
-  }
-
-  // We have |right_terms| strongly non-overlapping lists, we
-  // need to merge them efficiently
-  // Most efficient is to merge them in pairs of increasing size, giving
-  // O(n log(n)) runtime, versus O(n^2)
-  for (std::size_t merge_level = 1; 2 * merge_level <= right_terms.size();
-       merge_level *= 2) {
-    const std::size_t merge_size = merge_level * output_size;
-    std::size_t start = 0;
-    for (; start + 2 * merge_size <= result.size(); start += 2 * merge_size) {
-      auto merge_span = result.subspan(start, 2 * merge_size);
-      merge_sum_linear(merge_span, merge_span.begin() + merge_size);
+  if (right_terms.size() > 0) {
+    // Multiply all left_terms by all right_terms, keep track of where the spans
+    // end so we can merge them all at the end
+    auto out_iter = result.begin();
+    std::vector<decltype(out_iter)> mult_spans;
+    mult_spans.reserve(right_terms.size() + 1);
+    mult_spans.push_back(out_iter);
+    for (std::size_t i = 0; i < right_terms.size(); ++i) {
+      out_iter = sparse_mult_merge_term(left_terms, right_terms[i], out_iter);
+      mult_spans.push_back(out_iter);
     }
-    if (start < result.size()) {
-      if (start > 0) {
-        const std::size_t prev_start = start - 2 * merge_size;
-        const std::size_t span_len = result.size() - prev_start;
-        auto merge_span = result.subspan(prev_start, span_len);
-        merge_sum_linear(merge_span, merge_span.begin() + 2 * merge_size);
-      } else {
-        merge_sum_linear(result, result.begin() + 2 * merge_size);
-      }
-    }
+    return merge_spans(mult_spans);
+  } else {
+    return result.begin();
   }
-  return result.end();
 }
 
 template <arith_number eval_type>

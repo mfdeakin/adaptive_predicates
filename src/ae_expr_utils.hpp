@@ -386,6 +386,19 @@ static constexpr auto is_nonzero(const eval_type v) {
   return v != eval_type{0};
 }
 
+template <std::ranges::range range_type, typename allocator_type_>
+auto copy_nonzero(const range_type &range, allocator_type_ &&mem_pool) {
+  using eval_type = std::remove_cvref_t<decltype(*range.begin())>;
+  using allocator_type = std::remove_cvref_t<allocator_type_>;
+  auto nonzero_range = range | std::views::filter(is_nonzero<eval_type>);
+  const std::size_t size =
+      std::distance(nonzero_range.begin(), nonzero_range.end());
+  std::vector<eval_type, allocator_type> terms{size, mem_pool};
+  std::ranges::copy(nonzero_range, terms.begin());
+  std::ranges::fill(range, eval_type{0});
+  return terms;
+}
+
 template <typename eval_type, typename iterator>
 static constexpr auto zero_prune_store_inc(const eval_type v, iterator i)
     -> iterator {
