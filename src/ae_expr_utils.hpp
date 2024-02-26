@@ -4,6 +4,7 @@
 
 #include "ae_expr.hpp"
 
+#include <algorithm>
 #include <ranges>
 
 namespace adaptive_expr {
@@ -368,11 +369,19 @@ constexpr std::size_t get_memory_begin_idx() {
     return 0;
   } else {
     if constexpr (branch_id < _impl::right_branch_id<root_t>(root_branch_id)) {
-      return get_memory_begin_idx<branch_id -
+      constexpr std::size_t left_start =
+          num_partials_for_exact<root_t>() -
+          num_partials_for_exact<typename root_t::LHS>() -
+          num_partials_for_exact<typename root_t::RHS>();
+      return left_start +
+             get_memory_begin_idx<branch_id -
                                       _impl::left_branch_id(root_branch_id),
                                   typename root_t::LHS>();
     } else {
-      return num_partials_for_exact<typename root_t::LHS>() +
+      constexpr std::size_t right_start =
+          num_partials_for_exact<root_t>() -
+          num_partials_for_exact<typename root_t::RHS>();
+      return right_start +
              get_memory_begin_idx<branch_id - _impl::right_branch_id<root_t>(
                                                   root_branch_id),
                                   typename root_t::RHS>();
@@ -387,7 +396,7 @@ static constexpr auto is_nonzero(const eval_type v) {
 }
 
 template <std::ranges::range range_type, typename allocator_type_>
-auto copy_nonzero(const range_type &range, allocator_type_ &&mem_pool) {
+auto copy_nonzero(range_type &range, allocator_type_ &&mem_pool) {
   using eval_type = std::remove_cvref_t<decltype(*range.begin())>;
   using allocator_type = std::remove_cvref_t<allocator_type_>;
   auto nonzero_range = range | std::views::filter(is_nonzero<eval_type>);
@@ -400,7 +409,7 @@ auto copy_nonzero(const range_type &range, allocator_type_ &&mem_pool) {
 }
 
 template <typename eval_type, typename iterator>
-static constexpr auto zero_prune_store_inc(const eval_type v, iterator i)
+static constexpr auto zero_prune_store(const eval_type v, iterator i)
     -> iterator {
   if constexpr (scalar_type<eval_type>) {
     if (v) {
@@ -410,21 +419,6 @@ static constexpr auto zero_prune_store_inc(const eval_type v, iterator i)
   } else {
     *i = v;
     ++i;
-  }
-  return i;
-}
-
-template <typename eval_type, typename iterator>
-static constexpr auto zero_prune_store_dec(const eval_type v, iterator i)
-    -> iterator {
-  if constexpr (scalar_type<eval_type>) {
-    if (v) {
-      *i = v;
-      --i;
-    }
-  } else {
-    *i = v;
-    --i;
   }
   return i;
 }

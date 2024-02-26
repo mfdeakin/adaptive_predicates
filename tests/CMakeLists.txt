@@ -18,7 +18,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   endif()
 endif()
 
-add_executable(tests test_adaptive_expr.cpp test_geom_exprs.cpp test_determinant_4x4.cpp test_determinant_5x5.cpp)
+add_executable(tests test_adaptive_expr.cpp test_exact_eval.cpp test_geom_exprs.cpp test_determinant_4x4.cpp test_determinant_5x5.cpp)
 target_compile_features(tests PRIVATE cxx_std_23)
 target_compile_options(tests PRIVATE -fprofile-arcs -ftest-coverage)
 target_link_libraries(tests PRIVATE adaptive_predicates shewchuk Catch2::Catch2WithMain fmt)

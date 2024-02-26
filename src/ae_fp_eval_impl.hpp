@@ -196,15 +196,22 @@ template <arith_number eval_type, typename E_, std::ranges::range span_t>
   requires expr_type<E_> || arith_number<E_>
 constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
   using E = std::remove_cvref_t<E_>;
-  if constexpr (is_expr_v<E>) {
+  if constexpr (num_partials_for_exact<E>() == 0) {
+    return;
+  } else if constexpr (is_expr_v<E>) {
+    partial_results[num_partials_for_exact<E>() - 1] = eval_type{0};
     constexpr std::size_t reserve_left =
         num_partials_for_exact<typename E::LHS>();
-    const auto storage_left = partial_results.template first<reserve_left>();
-    exactfp_eval_impl<eval_type>(e.lhs(), storage_left);
     constexpr std::size_t reserve_right =
         num_partials_for_exact<typename E::RHS>();
+    constexpr std::size_t left_start =
+        num_partials_for_exact<E>() - reserve_left - reserve_right;
+    const auto storage_left =
+        partial_results.template subspan<left_start, reserve_left>();
+    exactfp_eval_impl<eval_type>(e.lhs(), storage_left);
     const auto storage_right =
-        partial_results.template subspan<reserve_left, reserve_right>();
+        partial_results
+            .template subspan<left_start + reserve_left, reserve_right>();
     exactfp_eval_impl<eval_type>(e.rhs(), storage_right);
     using Op = typename E::Op;
     if constexpr (std::is_same_v<std::minus<>, Op>) {
@@ -312,36 +319,27 @@ auto merge_sum_linear(
       for (auto &h : nonzero | std::views::drop(1)) {
         auto [R, g] = dekker_sum_unchecked(h, q);
         h = eval_type{0};
-        if (g != eval_type{0}) {
-          *out = g;
-          ++out;
-        }
+        out = zero_prune_store(g, out);
         std::tie(Q, q) = two_sum(Q, R);
       }
 
-      if (q != eval_type{0}) {
-        *out = q;
-        ++out;
-      }
-      if (Q != eval_type{0}) {
-        *out = Q;
-        ++out;
-      }
+      out = zero_prune_store(q, out);
+      out = zero_prune_store(Q, out);
 
       return std::pair{Q, out};
     } else if (nonzero_size == 1) {
       eval_type &v = *nonzero.begin();
       eval_type tmp = v;
-      v = 0;
+      v = eval_type{0};
       storage[0] = tmp;
       return std::pair{tmp, storage.begin() + 1};
     } else {
-      return std::pair{0, storage.begin()};
+      return std::pair{eval_type{0}, storage.begin()};
     }
   } else if (storage.size() == 1) {
     return std::pair{storage[0], storage.begin() + 1};
   } else {
-    return std::pair{0.0, storage.begin()};
+    return std::pair{eval_type{0}, storage.begin()};
   }
 }
 
@@ -350,12 +348,9 @@ constexpr auto merge_sum_append(auto begin, auto end, auto v) {
   auto out = begin;
   for (auto &e : std::span{begin, end}) {
     const auto [result, error] = two_sum(v, e);
-    e = eval_type{0.0};
+    e = eval_type{0};
     v = result;
-    if (error) {
-      *out = error;
-      ++out;
-    }
+    out = zero_prune_store(error, out);
   }
   return std::pair{out, v};
 }
@@ -368,13 +363,10 @@ constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage)
     auto out = storage.begin();
     for (eval_type &inp : storage | std::views::filter(is_nonzero<eval_type>)) {
       eval_type v = inp;
-      inp = eval_type{0.0};
+      inp = eval_type{0};
       auto [new_out, result] = merge_sum_append(storage.begin(), out, v);
       out = new_out;
-      if (result) {
-        *out = result;
-        ++out;
-      }
+      out = zero_prune_store(result, out);
     }
     if (out == storage.begin()) {
       return {eval_type{0}, out};
@@ -384,7 +376,7 @@ constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage)
   } else if (storage.size() == 1) {
     return {storage[0], storage.end()};
   } else {
-    return {eval_type{0.0}, storage.end()};
+    return {eval_type{0}, storage.end()};
   }
 }
 
@@ -410,7 +402,7 @@ constexpr auto merge_sum_quadratic_keep_zeros(std::ranges::range auto &&storage)
   } else if (storage.size() == 1) {
     return {storage[0], storage.end()};
   } else {
-    return {eval_type{0.0}, storage.end()};
+    return {eval_type{0}, storage.end()};
   }
 }
 
@@ -424,42 +416,30 @@ constexpr auto sparse_mult(span_l storage_left, span_r storage_right,
                 "Vectorization doesn't have a functional mul_sub method, "
                 "cannot efficiently evaluate multiplications exactly");
 #endif // __FMA__
-  // This performs multiplication in-place for a contiguous piece of memory
-  // starting at storage_left.begin() and ending at storage_mult.end()
+  // This performs multiplication in-place for a contiguous piece of memory,
+  // where storage_left and storage_right can alias parts of storage_mult
   //
   // storage_mult is initially empty and written to first
-  // storage_right is overwritten second, each value in storage_left is finished
+  // storage_left is overwritten second, each value in storage_left is finished
   // and over-writable when its iteration of the outer loop finishes
-  // storage_left can be shown to only be is overwritten during the final
+  // storage_right can be shown to only be is overwritten during the final
   // iteration of the outer loop, the values in it are only overwritten after
-  // they've been multiplied If storage_left and storage_right are sorted by
-  // increasing magnitude before multiplying, the first element in the output is
-  // the least significant and the last element is the most significant
-  auto out_i = storage_mult.end() - 1;
-  for (auto r_itr = storage_right.rbegin(); r_itr != storage_right.rend();
-       ++r_itr) {
-    const auto r = *r_itr;
-    for (auto l_itr = storage_left.rbegin(); l_itr != storage_left.rend();
-         ++l_itr) {
-      const auto l = *l_itr;
+  // they've been multiplied.
+  //
+  // If storage_left and storage_right are sorted by increasing magnitude before
+  // multiplying, the first element in the output is the least significant and
+  // the last element is the most significant
+  auto out_i = storage_mult.begin();
+  for (const auto l : storage_left) {
+    for (const auto r : storage_right) {
       auto [upper, lower] = exact_mult(r, l);
-      out_i = zero_prune_store_dec(upper, out_i);
-      out_i = zero_prune_store_dec(lower, out_i);
+      out_i = zero_prune_store(upper, out_i);
+      out_i = zero_prune_store(lower, out_i);
     }
   }
-  if (out_i >= storage_mult.begin()) {
-    // We want zeros at the end, so move the nonzero values to the beginning and
-    // overwrite the end
-    ++out_i;
-    std::copy(out_i, storage_mult.end(), storage_mult.begin());
-    const std::size_t num_terms =
-        storage_mult.size() - (out_i - storage_mult.begin());
-    out_i = storage_mult.begin() + num_terms;
-    std::fill(out_i, storage_mult.end(), typename span_m::value_type{0});
-    return out_i;
-  } else {
-    return storage_mult.end();
-  }
+  std::fill(out_i, storage_mult.end(),
+            std::remove_cvref_t<decltype(*out_i)>{0});
+  return out_i;
 }
 
 template <std::ranges::range span_l, typename eval_type, typename iterator_t>
@@ -478,15 +458,15 @@ constexpr auto sparse_mult_merge_term(const span_l storage_left,
   // h_{2m} <= Q_{2m}
   auto [high, low] = exact_mult(storage_left[0], v);
   eval_type accumulated = high;
-  out = zero_prune_store_inc(low, out);
+  out = zero_prune_store(low, out);
   for (std::size_t i = 1; i < storage_left.size(); ++i) {
     const auto [mult_high, mult_low] = exact_mult(storage_left[i], v);
     std::tie(high, low) = two_sum(accumulated, mult_low);
-    out = zero_prune_store_inc(low, out);
+    out = zero_prune_store(low, out);
     std::tie(accumulated, low) = two_sum(mult_high, high);
-    out = zero_prune_store_inc(low, out);
+    out = zero_prune_store(low, out);
   }
-  out = zero_prune_store_inc(accumulated, out);
+  out = zero_prune_store(accumulated, out);
   return out;
 }
 
@@ -533,6 +513,7 @@ constexpr auto sparse_mult_merge(span_l storage_left, span_r storage_right,
       copy_nonzero(storage_left, std::forward<allocator_type_>(mem_pool));
   auto right_terms =
       copy_nonzero(storage_right, std::forward<allocator_type_>(mem_pool));
+  std::ranges::fill(result, std::remove_cvref_t<decltype(result[0])>{0});
   if (left_terms.size() < right_terms.size()) {
     // We want to minimize the number of lists to merge at the end since merging
     // has a high constant cost
@@ -545,8 +526,8 @@ constexpr auto sparse_mult_merge(span_l storage_left, span_r storage_right,
     std::vector<decltype(out_iter)> mult_spans;
     mult_spans.reserve(right_terms.size() + 1);
     mult_spans.push_back(out_iter);
-    for (std::size_t i = 0; i < right_terms.size(); ++i) {
-      out_iter = sparse_mult_merge_term(left_terms, right_terms[i], out_iter);
+    for (const auto v : right_terms) {
+      out_iter = sparse_mult_merge_term(left_terms, v, out_iter);
       mult_spans.push_back(out_iter);
     }
     return merge_spans(mult_spans);

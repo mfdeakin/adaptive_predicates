@@ -243,21 +243,30 @@ private:
              std::span<eval_type, num_partials_for_exact<sub_expr_>()>
                  partial_results) noexcept {
     using sub_expr = std::remove_cvref_t<sub_expr_>;
-    if constexpr (is_expr_v<sub_expr>) {
+    if constexpr (num_partials_for_exact<sub_expr>() == 0) {
+      return;
+    } else if constexpr (is_expr_v<sub_expr>) {
       if (cache[branch_id]) {
         return;
       }
+      partial_results[num_partials_for_exact<sub_expr>() - 1] = eval_type{0};
       constexpr std::size_t reserve_left =
           num_partials_for_exact<typename sub_expr::LHS>();
-      const auto storage_left = partial_results.template first<reserve_left>();
-      exact_eval<_impl::left_branch_id(branch_id)>(e.lhs(), storage_left);
-
       constexpr std::size_t reserve_right =
           num_partials_for_exact<typename sub_expr::RHS>();
+      constexpr std::size_t start_left =
+          num_partials_for_exact<sub_expr>() - reserve_right - reserve_left;
+      const auto storage_left =
+          partial_results.template subspan<start_left, reserve_left>();
+
+      exact_eval<_impl::left_branch_id(branch_id)>(e.lhs(), storage_left);
+
       const auto storage_right =
-          partial_results.template subspan<reserve_left, reserve_right>();
+          partial_results
+              .template subspan<start_left + reserve_left, reserve_right>();
       exact_eval<_impl::right_branch_id<sub_expr>(branch_id)>(e.rhs(),
                                                               storage_right);
+
       if constexpr (_impl::linear_merge_lower_latency<eval_type, sub_expr_>()) {
         // Since we're at a point where we want to use linear merge sum,
         // we need to ensure the lower levels of the tree have been merged
@@ -295,8 +304,7 @@ private:
           _impl::sparse_mult(storage_left, storage_right, partial_results);
         }
       }
-    } else if constexpr (!std::is_same_v<additive_id, sub_expr>) {
-      // additive_id is zero, so we don't actually have memory allocated for it
+    } else {
       *partial_results.begin() = eval_type(e);
     }
   }
