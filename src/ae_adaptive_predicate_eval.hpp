@@ -87,9 +87,11 @@ private:
   std::pair<eval_type, eval_type> exact_eval_round(evaluatable auto &&expr) {
     using sub_expr = decltype(expr);
     auto memory = get_memory<branch_id, sub_expr>();
-    exact_eval_merge<branch_id>(std::forward<sub_expr>(expr), memory);
-    const eval_type exact_result = std::reduce(memory.begin(), memory.end());
-    cache[branch_id] = exact_result;
+    auto result_end =
+        exact_eval_merge<branch_id>(std::forward<sub_expr>(expr), memory);
+    const eval_type exact_result = std::reduce(memory.begin(), result_end);
+    cache[branch_id] =
+        std::pair{exact_result, std::distance(memory.begin(), result_end)};
     return {exact_result, abs(exact_result) *
                               std::numeric_limits<eval_type>::epsilon() / 2.0};
   }
@@ -168,8 +170,8 @@ private:
     if constexpr (is_expr_v<sub_expr>) {
       const auto exact_eval_info = cache[branch_id];
       if (exact_eval_info) {
-        return {*exact_eval_info,
-                abs(*exact_eval_info) *
+        return {exact_eval_info->first,
+                abs(exact_eval_info->first) *
                     std::numeric_limits<eval_type>::epsilon() / 2.0};
       }
       using Op = typename sub_expr::Op;
@@ -221,35 +223,41 @@ private:
 
   template <std::size_t branch_id, typename sub_expr>
     requires expr_type<sub_expr> || arith_number<sub_expr>
-  constexpr void
+  constexpr auto
   exact_eval_merge(sub_expr &&e,
                    std::span<eval_type, num_partials_for_exact<sub_expr>()>
-                       partial_results) noexcept {
-    exact_eval<branch_id>(std::forward<sub_expr>(e), partial_results);
+                       partial_results) noexcept
+      -> decltype(partial_results.end()) {
+    auto partial_last =
+        exact_eval<branch_id>(std::forward<sub_expr>(e), partial_results);
     if constexpr (!_impl::linear_merge_lower_latency<eval_type, sub_expr>()) {
       // In cases where the linear merge algorithm doesn't make sense, we need
       // to ensure we can compute the correctly rounded result with just a
       // reduction.
       // In cases where the linear merge algorithm does make sense, this is
       // already handled by exact_eval
-      _impl::merge_sum(partial_results);
+      std::span nonzero_results{partial_results.begin(), partial_last};
+      auto nonzero_last = _impl::merge_sum(nonzero_results).second;
+      partial_last = partial_results.begin() +
+                     std::distance(nonzero_results.begin(), nonzero_last);
     }
+    return partial_last;
   }
 
   template <std::size_t branch_id, typename sub_expr_>
     requires expr_type<sub_expr_> || arith_number<sub_expr_>
-  constexpr void
+  constexpr auto
   exact_eval(sub_expr_ &&e,
              std::span<eval_type, num_partials_for_exact<sub_expr_>()>
-                 partial_results) noexcept {
+                 partial_results) noexcept -> decltype(partial_results.end()) {
     using sub_expr = std::remove_cvref_t<sub_expr_>;
     if constexpr (num_partials_for_exact<sub_expr>() == 0) {
-      return;
+      return partial_results.begin();
     } else if constexpr (is_expr_v<sub_expr>) {
       if (cache[branch_id]) {
-        return;
+        return partial_results.begin() + cache[branch_id]->second;
       }
-      partial_results[num_partials_for_exact<sub_expr>() - 1] = eval_type{0};
+      constexpr std::size_t left_id = _impl::left_branch_id(branch_id);
       constexpr std::size_t reserve_left =
           num_partials_for_exact<typename sub_expr::LHS>();
       constexpr std::size_t reserve_right =
@@ -259,13 +267,14 @@ private:
       const auto storage_left =
           partial_results.template subspan<start_left, reserve_left>();
 
-      exact_eval<_impl::left_branch_id(branch_id)>(e.lhs(), storage_left);
+      auto left_end = exact_eval<left_id>(e.lhs(), storage_left);
 
+      constexpr std::size_t start_right =
+          num_partials_for_exact<sub_expr>() - reserve_right;
       const auto storage_right =
-          partial_results
-              .template subspan<start_left + reserve_left, reserve_right>();
-      exact_eval<_impl::right_branch_id<sub_expr>(branch_id)>(e.rhs(),
-                                                              storage_right);
+          partial_results.template subspan<start_right, reserve_right>();
+      auto right_end = exact_eval<_impl::right_branch_id<sub_expr>(branch_id)>(
+          e.rhs(), storage_right);
 
       if constexpr (_impl::linear_merge_lower_latency<eval_type, sub_expr_>()) {
         // Since we're at a point where we want to use linear merge sum,
@@ -274,11 +283,17 @@ private:
         // used, then they're already merged and we don't need to do anything
         if constexpr (!_impl::linear_merge_lower_latency<eval_type,
                                                          decltype(e.lhs())>()) {
-          _impl::merge_sum(storage_left);
+          const std::span nonzero_left{storage_left.begin(), left_end};
+          left_end = storage_left.begin() +
+                     std::distance(nonzero_left.begin(),
+                                   _impl::merge_sum(nonzero_left).second);
         }
         if constexpr (!_impl::linear_merge_lower_latency<eval_type,
                                                          decltype(e.rhs())>()) {
-          _impl::merge_sum(storage_right);
+          const std::span nonzero_right{storage_right.begin(), right_end};
+          right_end = storage_right.begin() +
+                      std::distance(nonzero_right.begin(),
+                                    _impl::merge_sum(nonzero_right).second);
         }
       }
 
@@ -286,30 +301,52 @@ private:
       if constexpr (std::is_same_v<std::plus<>, Op> ||
                     std::is_same_v<std::minus<>, Op>) {
         if constexpr (std::is_same_v<std::minus<>, Op>) {
-          for (eval_type &v : storage_right) {
+          for (eval_type &v : std::span{storage_right.begin(), right_end}) {
             v = -v;
           }
         }
         if constexpr (_impl::linear_merge_lower_latency<eval_type,
                                                         sub_expr_>()) {
-          _impl::merge_sum_linear(partial_results,
-                                  partial_results.begin() + reserve_left);
+          std::span left_span{storage_left.begin(), left_end};
+          std::vector<eval_type, allocator_type> left_copy(mem_pool);
+          left_copy.reserve(left_span.size());
+          for (const auto v : left_span) {
+            left_copy.push_back(v);
+          }
+          return _impl::merge_sum_linear(
+                     partial_results, std::span{left_copy},
+                     std::span{storage_right.begin(), right_end})
+              .second;
+        } else {
+          // We must compact so that the returned end iterator doesn't include
+          // garbage data
+          return std::copy(storage_right.begin(), right_end,
+                           partial_results.begin() +
+                               std::distance(storage_left.begin(), left_end));
         }
       } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
         if constexpr (_impl::linear_merge_lower_latency<eval_type,
                                                         sub_expr_>()) {
-          _impl::sparse_mult_merge(storage_left, storage_right, partial_results,
-                                   mem_pool);
+          return _impl::sparse_mult_merge(
+              std::span{storage_left.begin(), left_end},
+              std::span{storage_right.begin(), right_end}, partial_results,
+              mem_pool);
         } else {
-          _impl::sparse_mult(storage_left, storage_right, partial_results);
+          return _impl::sparse_mult(storage_left, storage_right,
+                                    partial_results);
         }
       }
     } else {
       *partial_results.begin() = eval_type(e);
+      return partial_results.begin() + 1;
     }
   }
 
-  std::array<std::optional<eval_type>, num_internal_nodes<E>()> cache;
+  // Cache the rounded value and the index of the end of the non-zero element
+  // subspan
+  std::array<std::optional<std::pair<eval_type, std::size_t>>,
+             num_internal_nodes<E>()>
+      cache;
 
   allocator_type mem_pool;
 

@@ -68,7 +68,7 @@ TEST_CASE("sparse_mult eval", "[sparse_mult]") {
       REQUIRE(std::find(result_span.begin(), result_last, v) != result_last);
     }
   }
-  for (const auto v : results) {
+  for (const auto v : std::span{result_span.begin(), result_last}) {
     // Ensure that v is in either in_high or in_low, but not both
     const bool in_high = std::ranges::find(high_terms, v) != high_terms.end();
     const bool in_low = std::ranges::find(low_terms, v) != low_terms.end();
@@ -80,25 +80,30 @@ TEST_CASE("sparse_mult_merge eval", "[sparse_mult_merge]") {
   auto [results, left, right] = mult_test_case();
   REQUIRE(is_nonoverlapping(left));
   REQUIRE(is_nonoverlapping(right));
-  std::vector expected_results = results;
-  sparse_mult(left, right, std::span{expected_results});
+  std::vector expected_results_vec = results;
   std::span result_span{results};
   auto result_last =
       sparse_mult_merge(left, right, result_span, std::allocator<real>());
+
+  result_span = std::span{result_span.begin(), result_last};
   REQUIRE(is_nonoverlapping(result_span));
   std::vector<real> nonzero_results;
-  for (const auto v : std::span{result_span.begin(), result_last}) {
+  for (const auto v : result_span) {
     // zero-pruning check
     REQUIRE(v != real{0});
     nonzero_results.push_back(v);
   }
   // Check that the result is correct by subtracting values that sum to the same
   // thing that a correct implementation produces
+  std::span expected_results{expected_results_vec};
+  auto expected_last = sparse_mult(left, right, expected_results);
+  expected_results = std::span{expected_results.begin(), expected_last};
   for (const auto v : expected_results) {
     nonzero_results.push_back(-v);
   }
   result_span = std::span{nonzero_results};
   const auto merge_result = merge_sum(result_span);
+
   REQUIRE(merge_result.first == real{0});
   REQUIRE(merge_result.second == result_span.begin());
   for (const auto v : nonzero_results) {
@@ -155,7 +160,7 @@ TEST_CASE("sparse_mult inplace eval", "[sparse_mult_inplace]") {
       REQUIRE(std::find(result_span.begin(), result_last, v) != result_last);
     }
   }
-  for (const auto v : results) {
+  for (const auto v : std::span{result_span.begin(), result_last}) {
     // Ensure that v is in either in_high or in_low
     const bool in_high = std::ranges::find(high_terms, v) != high_terms.end();
     const bool in_low = std::ranges::find(low_terms, v) != low_terms.end();
@@ -172,7 +177,7 @@ TEST_CASE("sparse_mult_merge inplace eval", "[sparse_mult_merge_inplace]") {
   std::span result_span{results};
   auto result_last =
       sparse_mult_merge(left, right, result_span, std::allocator<real>());
-  REQUIRE(is_nonoverlapping(result_span));
+  REQUIRE(is_nonoverlapping(std::span{result_span.begin(), result_last}));
   std::vector<real> nonzero_results;
   for (const auto v : std::span{result_span.begin(), result_last}) {
     // zero pruning check

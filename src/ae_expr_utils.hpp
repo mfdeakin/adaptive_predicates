@@ -404,7 +404,6 @@ auto copy_nonzero(range_type &range, allocator_type_ &&mem_pool) {
       std::distance(nonzero_range.begin(), nonzero_range.end());
   std::vector<eval_type, allocator_type> terms{size, mem_pool};
   std::ranges::copy(nonzero_range, terms.begin());
-  std::ranges::fill(range, eval_type{0});
   return terms;
 }
 

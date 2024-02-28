@@ -400,8 +400,15 @@ TEST_CASE("nonoverlapping", "[eval_utils]") {
   REQUIRE(midpoint1 > merge_test1.begin());
   REQUIRE(midpoint1 < merge_test1.end());
 
-  merge_sum_linear(merge_test1, midpoint1);
-  CHECK(is_nonoverlapping(merge_test1));
+  std::vector<real> left;
+  for (const auto v : std::span{merge_test1.begin(), merge_test1.begin() + 3}) {
+    left.push_back(v);
+  }
+  const auto merge_end =
+      merge_sum_linear(merge_test1, left,
+                       std::span{midpoint1, merge_test1.end() - 1})
+          .second;
+  CHECK(is_nonoverlapping(std::span{merge_test1.begin(), merge_end}));
 
   // Same strongly non-overlapping sequence but for merge_sum_linear_fast
   std::vector<real> merge_test2{0,

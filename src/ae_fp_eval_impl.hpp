@@ -15,23 +15,32 @@ namespace adaptive_expr {
 
 namespace _impl {
 
-/* merge_sum_linear runs in-place in linear time, but requires the two sequences
- * in storage to be strongly non-overlapping.
+/* merge_sum_linear runs in linear time, but requires the two sequences
+ * left and right to be non-overlapping.
+ *
+ * merge_sum_linear_fast performs two fewer additions per value, but requires
+ * the two sequences left and right to be strongly non-overlapping.
+ *
  * That is, each sequence must be non-overlapping and elements which aren't
  * powers of two must be non-adjacent. Elements which are powers of two can be
  * adjacent to at most one other element in its sequence.
  * Elements a, b with abs(a) < abs(b) are adjacent if (a, b) is overlapping or
  * if (2 * a, b) is overlapping
+ *
+ * One of left or right can alias with the tail of the result so long as there
+ * is space for the two sequences to be merged, starting from the beginning of
+ * result
  */
-auto merge_sum_linear(
-    std::ranges::range auto &&storage,
-    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint)
-    -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
-                 typename std::remove_cvref_t<decltype(storage.end())>>;
+auto merge_sum_linear(std::ranges::range auto &&result,
+                      std::ranges::range auto &&left,
+                      std::ranges::range auto &&right)
+    -> std::pair<typename std::remove_cvref_t<decltype(result)>::value_type,
+                 typename std::remove_cvref_t<decltype(result.end())>>;
 auto merge_sum_linear_fast(
     std::ranges::range auto &&storage,
     const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint) ->
     typename std::remove_cvref_t<decltype(storage)>::value_type;
+
 constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage)
     -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
                  std::remove_cvref_t<decltype(storage.end())>>;
@@ -194,12 +203,12 @@ error_overlaps(const eval_type left_result, const eval_type left_abs_err,
 
 template <arith_number eval_type, typename E_, std::ranges::range span_t>
   requires expr_type<E_> || arith_number<E_>
-constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
+constexpr auto exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept
+    -> decltype(partial_results.end()) {
   using E = std::remove_cvref_t<E_>;
   if constexpr (num_partials_for_exact<E>() == 0) {
-    return;
+    return partial_results.begin();
   } else if constexpr (is_expr_v<E>) {
-    partial_results[num_partials_for_exact<E>() - 1] = eval_type{0};
     constexpr std::size_t reserve_left =
         num_partials_for_exact<typename E::LHS>();
     constexpr std::size_t reserve_right =
@@ -208,21 +217,28 @@ constexpr void exactfp_eval_impl(E_ &&e, span_t partial_results) noexcept {
         num_partials_for_exact<E>() - reserve_left - reserve_right;
     const auto storage_left =
         partial_results.template subspan<left_start, reserve_left>();
-    exactfp_eval_impl<eval_type>(e.lhs(), storage_left);
-    const auto storage_right =
-        partial_results
-            .template subspan<left_start + reserve_left, reserve_right>();
-    exactfp_eval_impl<eval_type>(e.rhs(), storage_right);
+    const auto left_end = exactfp_eval_impl<eval_type>(e.lhs(), storage_left);
+
+    const std::size_t right_start =
+        left_start + std::distance(storage_left.begin(), left_end);
+    const std::span<eval_type, reserve_right> storage_right{
+        partial_results.begin() + right_start, reserve_right};
+    const auto right_end = exactfp_eval_impl<eval_type>(e.rhs(), storage_right);
+
     using Op = typename E::Op;
-    if constexpr (std::is_same_v<std::minus<>, Op>) {
-      for (eval_type &v : storage_right) {
-        v = -v;
+    if constexpr (std::is_same_v<std::multiplies<>, Op>) {
+      return sparse_mult(storage_left, storage_right, partial_results);
+    } else {
+      if constexpr (std::is_same_v<std::minus<>, Op>) {
+        for (auto &v : std::span{storage_right.begin(), right_end}) {
+          v = -v;
+        }
       }
-    } else if constexpr (std::is_same_v<std::multiplies<>, Op>) {
-      sparse_mult(storage_left, storage_right, partial_results);
+      return partial_results.begin() + right_start +
+             std::distance(storage_right.begin(), right_end);
     }
   } else if constexpr (!std::is_same_v<additive_id, E>) {
-    partial_results[0] = eval_type(e);
+    return zero_prune_store(eval_type(e), partial_results.begin());
   }
 }
 
@@ -276,70 +292,32 @@ auto merge_sum_linear_fast(
 }
 
 // Linear merge sum without the strongly non-overlapping requirement
-auto merge_sum_linear(
-    std::ranges::range auto &&storage,
-    const typename std::remove_cvref_t<decltype(storage)>::iterator midpoint)
-    -> std::pair<typename std::remove_cvref_t<decltype(storage)>::value_type,
-                 typename std::remove_cvref_t<decltype(storage.end())>> {
-  using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
-  if (storage.size() > 1) {
-    std::ranges::inplace_merge(
-        storage, midpoint, [](const eval_type &left, const eval_type &right) {
-          // Zero pruning ensures all of the zeros are at the ends of left and
-          // right, so we need to ensure that zero is considered greater than
-          // any non-zero number
-          // This algorithm technically works regardless of where the zeros are,
-          // but ensuring they remain at the end allows us to reduce the number
-          // of computations we have to perform
-          if (left == eval_type{0}) {
-            return false;
-          } else if (right == eval_type{0}) {
-            return true;
-          } else {
-            return abs(left) < abs(right);
-          }
-        });
-
-    // Not all of the code puts filtered zeros at the end yet, so we have to use
-    // an expensive filter
-    auto nonzero = storage | std::views::filter(is_nonzero<eval_type>);
-    std::size_t nonzero_size = 0;
-    for (auto i = nonzero.begin(); i != nonzero.end(); ++i) {
-      ++nonzero_size;
+auto merge_sum_linear(std::ranges::range auto &&result,
+                      std::ranges::range auto &&left,
+                      std::ranges::range auto &&right)
+    -> std::pair<typename std::remove_cvref_t<decltype(result)>::value_type,
+                 typename std::remove_cvref_t<decltype(result.end())>> {
+  using eval_type = typename std::remove_cvref_t<decltype(result)>::value_type;
+  const auto [left_last, right_last, result_last] = std::ranges::merge(
+      left, right, result.begin(),
+      [](eval_type l, eval_type r) { return abs(l) < abs(r); });
+  if (std::distance(result.begin(), result_last) > 1) {
+    auto [Q, q] = dekker_sum_unchecked(result[1], result[0]);
+    auto out = result.begin();
+    for (auto &h : std::span{result.begin() + 2, result_last}) {
+      auto [R, g] = dekker_sum_unchecked(h, q);
+      out = zero_prune_store(g, out);
+      std::tie(Q, q) = two_sum(Q, R);
     }
-    if (nonzero_size > 1) {
-      auto &a = *nonzero.begin();
-      auto &b = *(++nonzero.begin());
-      auto [Q, q] = dekker_sum_unchecked(b, a);
-      // Because we aren't overwriting the entire array, we need to clear
-      // the values that we've processed
-      a = 0;
-      b = 0;
-      auto out = storage.begin();
-      for (auto &h : nonzero | std::views::drop(1)) {
-        auto [R, g] = dekker_sum_unchecked(h, q);
-        h = eval_type{0};
-        out = zero_prune_store(g, out);
-        std::tie(Q, q) = two_sum(Q, R);
-      }
 
-      out = zero_prune_store(q, out);
-      out = zero_prune_store(Q, out);
+    out = zero_prune_store(q, out);
+    out = zero_prune_store(Q, out);
 
-      return std::pair{Q, out};
-    } else if (nonzero_size == 1) {
-      eval_type &v = *nonzero.begin();
-      eval_type tmp = v;
-      v = eval_type{0};
-      storage[0] = tmp;
-      return std::pair{tmp, storage.begin() + 1};
-    } else {
-      return std::pair{eval_type{0}, storage.begin()};
-    }
-  } else if (storage.size() == 1) {
-    return std::pair{storage[0], storage.begin() + 1};
+    return std::pair{Q, out};
+  } else if (std::distance(result.begin(), result_last) == 1) {
+    return std::pair{result[0], result.begin() + 1};
   } else {
-    return std::pair{eval_type{0}, storage.begin()};
+    return std::pair{eval_type{0}, result.begin()};
   }
 }
 
@@ -361,7 +339,7 @@ constexpr auto merge_sum_quadratic(std::ranges::range auto &&storage)
   using eval_type = typename std::remove_cvref_t<decltype(storage)>::value_type;
   if (storage.size() > 1) {
     auto out = storage.begin();
-    for (eval_type &inp : storage | std::views::filter(is_nonzero<eval_type>)) {
+    for (eval_type &inp : storage) {
       eval_type v = inp;
       inp = eval_type{0};
       auto [new_out, result] = merge_sum_append(storage.begin(), out, v);
@@ -437,8 +415,7 @@ constexpr auto sparse_mult(span_l storage_left, span_r storage_right,
       out_i = zero_prune_store(lower, out_i);
     }
   }
-  std::fill(out_i, storage_mult.end(),
-            std::remove_cvref_t<decltype(*out_i)>{0});
+
   return out_i;
 }
 
@@ -471,8 +448,9 @@ constexpr auto sparse_mult_merge_term(const span_l storage_left,
 }
 
 // Recursively merges the subspans with the linear merge algorithm
-template <std::ranges::range iter_span_type>
-constexpr auto merge_spans(const iter_span_type &iter_spans)
+template <typename iter_span_type, typename allocator_type>
+constexpr auto merge_spans(const iter_span_type &iter_spans,
+                           allocator_type &&mem_pool)
     -> std::remove_cvref_t<decltype(iter_spans[0])> {
   if (iter_spans.size() == 1) {
     // We have zero ranges, nothing to do
@@ -482,44 +460,47 @@ constexpr auto merge_spans(const iter_span_type &iter_spans)
     return iter_spans[1];
   } else {
     const std::size_t midpoint_itr = (iter_spans.size() - 1) / 2;
+
     // The iterator marking beginning of the right subspan must be included in
     // this subspan, so add 1 to midpoint
-    const auto left_span = std::span{iter_spans}.subspan(0, midpoint_itr + 1);
-    merge_spans(left_span);
-    const auto right_span = std::span{iter_spans}.subspan(
-        midpoint_itr, iter_spans.size() - midpoint_itr);
-    const auto right_end = merge_spans(right_span);
+    const std::span left_span = iter_spans | std::views::take(midpoint_itr + 1);
+    const std::span right_span = iter_spans | std::views::drop(midpoint_itr);
 
-    // Merge the two merged subspans together
-    std::span storage{iter_spans[0], right_end};
-    const auto midpoint_idx =
-        std::distance(iter_spans[0], iter_spans[midpoint_itr]);
+    const auto left_end =
+        merge_spans(left_span, std::forward<allocator_type>(mem_pool));
+    using eval_type = std::remove_cvref_t<decltype(*iter_spans[0])>;
 
-    const auto merge_itr =
-        merge_sum_linear(storage, storage.begin() + midpoint_idx).second;
-    // Unfortunately storage's type may have a different iterator type than
-    // what's in the span of iterators that we have, so we have to compute the
-    // equivalent iterator for
-    return iter_spans[0] + std::distance(storage.begin(), merge_itr);
+    const auto right_end =
+        merge_spans(right_span, std::forward<allocator_type>(mem_pool));
+
+    // Merge the spans together. merge_sum_linear requires left not alias
+    // the output, so copy left out
+    std::vector<eval_type, std::remove_cvref_t<allocator_type>> left_copy(
+        std::forward<allocator_type>(mem_pool));
+    left_copy.reserve(std::distance(left_span[0], left_end));
+    for (auto &v : std::span{iter_spans[0], left_end}) {
+      left_copy.push_back(v);
+    }
+
+    std::span results{iter_spans[0], *(iter_spans.end() - 1)};
+    auto results_end = merge_sum_linear(results, std::span{left_copy},
+                                        std::span{right_span[0], right_end})
+                           .second;
+    return iter_spans[0] + std::distance(results.begin(), results_end);
   }
 }
 
 template <std::ranges::range span_l, std::ranges::range span_r,
           std::ranges::range span_result, typename allocator_type_>
-constexpr auto sparse_mult_merge(span_l storage_left, span_r storage_right,
+constexpr auto sparse_mult_merge(span_l left_terms, span_r right_terms,
                                  span_result result, allocator_type_ &&mem_pool)
     -> decltype(result.end()) {
-  auto left_terms =
-      copy_nonzero(storage_left, std::forward<allocator_type_>(mem_pool));
-  auto right_terms =
-      copy_nonzero(storage_right, std::forward<allocator_type_>(mem_pool));
-  std::ranges::fill(result, std::remove_cvref_t<decltype(result[0])>{0});
   if (left_terms.size() < right_terms.size()) {
     // We want to minimize the number of lists to merge at the end since merging
     // has a high constant cost
-    std::swap(left_terms, right_terms);
-  }
-  if (right_terms.size() > 0) {
+    return sparse_mult_merge(right_terms, left_terms, result,
+                             std::forward<allocator_type_>(mem_pool));
+  } else if (right_terms.size() > 0) {
     // Multiply all left_terms by all right_terms, keep track of where the spans
     // end so we can merge them all at the end
     auto out_iter = result.begin();
@@ -530,7 +511,8 @@ constexpr auto sparse_mult_merge(span_l storage_left, span_r storage_right,
       out_iter = sparse_mult_merge_term(left_terms, v, out_iter);
       mult_spans.push_back(out_iter);
     }
-    return merge_spans(mult_spans);
+
+    return merge_spans(mult_spans, std::forward<allocator_type_>(mem_pool));
   } else {
     return result.begin();
   }
